@@ -60,6 +60,8 @@ class Socks5ServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, *args):
         self.transport.close()
+        if hasattr(self, 'remote_transport'):
+            self.remote_transport.close()
 
     def data_received(self, data):
         #print(data)
@@ -162,38 +164,37 @@ class Socks5ServerProtocol(asyncio.Protocol):
     async def cmd_connect(self):
         #print(self.host, self.port)
         try:
-            self.client_transport, protocol = await loop.create_connection(lambda: TCPRelayProtocol(self.transport), str(self.host), self.port)
+            self.remote_transport, protocol = await loop.create_connection(lambda: TCPRelayProtocol(self.transport), str(self.host), self.port)
         except Exception as e:
             logger.error('tcp error {}:{}'.format(self.host, self.port), exc_info=True)
             data = pack('!BBB', 5, 1, 0) + self.resp + st_port.pack(self.port)
             self.transport.write(data)
             self.transport.close()
         else:
-            ip, port = self.client_transport.get_extra_info('sockname')
+            ip, port = self.remote_transport.get_extra_info('sockname')
             ipv4 = [int(i) for i in ip.split('.')]
             data = st_reply.pack(5, 0, 0, 1, *ipv4, self.port)
             self.transport.write(data)
-            self.client_transport.write(self._buffer)
+            self.remote_transport.write(self._buffer)
             del self._buffer[:]
-            return self.client_transport
+            return self.remote_transport
 
     async def cmd_associate(self):
         ip = '0.0.0.0'
         host = self.transport.get_extra_info('peername')[0]
         addr = (host, self.port)
         try:
-            transport, protocol = await loop.create_datagram_endpoint(lambda: UDPRelayProtocol(addr), local_addr=(ip, 0))
+            self.remote_transport, protocol = await loop.create_datagram_endpoint(lambda: UDPRelayProtocol(addr), local_addr=(ip, 0))
         except Exception as e:
             logger.error('udp error {}:{}'.format(ip, 0), exc_info=True)
             data = st_reply.pack(5, 1, 0, 1, 0, 0, 0, 0, 0)
             self.transport.write(data)
             return
-        bind_addr = transport.get_extra_info('sockname')
+        bind_addr = self.remote_transport.get_extra_info('sockname')
         logger.debug('Socks5 UDP Server running on: {}'.format(bind_addr))
         data = st_reply.pack(5, 0, 0, 1, 0, 0, 0, 0, bind_addr[1])
         self.transport.write(data)
         self._size = 0
-        return self.transport
 
     async def send_data(self, data):
         if hasattr(self, 'waiter'):
