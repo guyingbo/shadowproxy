@@ -192,7 +192,7 @@ class ServerBase(StreamWrapper):
         return remote_conn, remote_stream
 
     async def relay(self, remote_stream):
-        async with remote_stream, self:
+        async with remote_stream:
             t1 = await spawn(self._relay(self._stream, remote_stream))
             t2 = await spawn(self._relay2(remote_stream, self._stream))
             try:
@@ -277,7 +277,7 @@ class SSConnection(ServerBase, SSBase):
         self.via = via
 
     async def relay(self, remote_stream):
-        async with remote_stream, self:
+        async with remote_stream:
             t1 = await spawn(self._relay(self, remote_stream))
             t2 = await spawn(self._relay(remote_stream, self))
             try:
@@ -299,10 +299,7 @@ class SSConnection(ServerBase, SSBase):
         # await self._stream.write(self.encrypter.iv)
         self.taddr = await self.read_addr()
         remote_conn, remote_stream = await self.connect_remote()
-        #print(f'Connecting {self.taddr[0]}:{self.taddr[1]} from {self.laddr[0]}:{self.laddr[1]}')
-        #remote_conn = await curio.open_connection(*self.taddr)
         async with remote_conn, counter:
-            #remote_stream = remote_conn.as_stream()
             await self.relay(remote_stream)
 
     async def read_addr(self):
@@ -366,15 +363,6 @@ class SocksConnection(ServerBase):
         host, port, data = await self.read_addr(atyp)
         self.taddr = (host, port)
         remote_conn, remote_stream = await self.connect_remote()
-        #if self.via:
-        #    via_client = self.via()
-        #    print(f'Connecting {self.taddr[0]}:{self.taddr[1]} from {self.laddr[0]}:{self.laddr[1]} via {via_client.raddr[0]}:{via_client.raddr[1]}')
-        #    remote_conn, remote_stream = await via_client.connect()
-        #    await remote_stream.write(data)
-        #else:
-        #    print(f'Connecting {self.taddr[0]}:{self.taddr[1]} from {self.laddr[0]}:{self.laddr[1]}')
-        #    remote_conn = await curio.open_connection(*self.taddr)
-        #    remote_stream = remote_conn.as_stream()
         async with remote_conn, counter:
             await self._stream.write(self._make_resp())
             await self.relay(remote_stream)
