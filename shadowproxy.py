@@ -178,29 +178,41 @@ class ServerBase(StreamWrapper):
 
     async def connect_remote(self):
         if getattr(self, 'via', None):
-            via_client = self.via()
-            print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
-                  f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]} '
-                  f'via {via_client.raddr[0]}:{via_client.raddr[1]}')
-            remote_conn, remote_stream = await via_client.connect()
-            await remote_stream.write(pack_addr(self.taddr))
+            self.via_client = self.via()
+            if verbose > 0:
+                print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
+                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]} '
+                      f'via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}')
+            remote_conn = await self.via_client.connect()
         else:
-            print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
-                  f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]}')
+            self.via_client = None
+            if verbose > 0:
+                print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
+                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]}')
             remote_conn = await curio.open_connection(*self.taddr)
+        return remote_conn
+
+    async def get_remote_stream(self):
+        if self.via_client:
+            remote_stream = self.via_client.as_stream()
+            try:
+                await remote_stream.client_init(self.taddr)
+            except Exception as e:
+                await remote_stream.close()
+                raise e
+        else:
             remote_stream = remote_conn.as_stream()
-        return remote_conn, remote_stream
+        return remote_stream
 
     async def relay(self, remote_stream):
-        async with remote_stream:
-            t1 = await spawn(self._relay(self._stream, remote_stream))
-            t2 = await spawn(self._relay2(remote_stream, self._stream))
-            try:
-                async with wait([t1, t2]) as w:
-                    task = await w.next_done()
-                    result = await task.join()
-            except CancelledError:
-                pass
+        t1 = await spawn(self._relay(self._stream, remote_stream))
+        t2 = await spawn(self._relay2(remote_stream, self._stream))
+        try:
+            async with wait([t1, t2]) as w:
+                task = await w.next_done()
+                result = await task.join()
+        except CancelledError:
+            pass
 
     async def _relay(self, rstream, wstream):
         try:
@@ -239,9 +251,11 @@ class RedirectConnection(ServerBase):
         return (await super().__call__(client, addr))
 
     async def interact(self):
-        remote_conn, remote_stream = await self.connect_remote()
+        remote_conn = await self.connect_remote()
         async with remote_conn, counter:
-            await self.relay(remote_stream)
+            remote_stream = await self.get_remote_stream()
+            async with remote_stream:
+                await self.relay(remote_stream)
 
 
 class SSBase(StreamWrapper):
@@ -269,6 +283,10 @@ class SSBase(StreamWrapper):
             await self._stream.write(self.encrypter.iv)
         return await self._stream.write(self.encrypter.encrypt(data))
 
+    async def client_init(self, taddr):
+        await self._stream.write(self.encrypter.iv)
+        await self.write(pack_addr(taddr))
+
 
 class SSConnection(ServerBase, SSBase):
     def __init__(self, cipher_cls, password, via=None):
@@ -277,19 +295,18 @@ class SSConnection(ServerBase, SSBase):
         self.via = via
 
     async def relay(self, remote_stream):
-        async with remote_stream:
-            t1 = await spawn(self._relay(self, remote_stream))
-            t2 = await spawn(self._relay(remote_stream, self))
-            try:
-                async with wait([t1, t2]) as w:
-                    task = await w.next_done()
-                    result = await task.join()
-            except CancelledError:
-                pass
-            #async for task in wait([t1, t2]):
-            #    result = await task.join()
-                #print(task, 'quit')
-            #return await curio.gather([t1, t2])
+        t1 = await spawn(self._relay(self, remote_stream))
+        t2 = await spawn(self._relay(remote_stream, self))
+        try:
+            async with wait([t1, t2]) as w:
+                task = await w.next_done()
+                result = await task.join()
+        except CancelledError:
+            pass
+        #async for task in wait([t1, t2]):
+        #    result = await task.join()
+            #print(task, 'quit')
+        #return await curio.gather([t1, t2])
 
     async def interact(self):
         iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
@@ -298,9 +315,11 @@ class SSConnection(ServerBase, SSBase):
         # self.encrypter = self.cipher_cls(self.password)
         # await self._stream.write(self.encrypter.iv)
         self.taddr = await self.read_addr()
-        remote_conn, remote_stream = await self.connect_remote()
+        remote_conn = await self.connect_remote()
         async with remote_conn, counter:
-            await self.relay(remote_stream)
+            remote_stream = await self.get_remote_stream()
+            async with remote_stream:
+                await self.relay(remote_stream)
 
     async def read_addr(self):
         atyp = await self.read_exactly(1)
@@ -330,14 +349,16 @@ class SSClient:
         self.raddr = (host, port)
 
     async def connect(self):
-        conn = await curio.open_connection(*self.raddr)
+        self.conn = await curio.open_connection(*self.raddr)
+        return self.conn
+
+    def as_stream(self):
         stream = SSBase()
-        stream._stream = conn.as_stream()
+        stream._stream = self.conn.as_stream()
         stream.encrypter = self.cipher_cls(self.password)
-        await stream._stream.write(stream.encrypter.iv)
         stream.cipher_cls = self.cipher_cls
         stream.password = self.password
-        return conn, stream
+        return stream
 
 
 class SocksConnection(ServerBase):
@@ -362,10 +383,12 @@ class SocksConnection(ServerBase):
             raise Exception(f'unknown cmd: {cmd}') from None
         host, port, data = await self.read_addr(atyp)
         self.taddr = (host, port)
-        remote_conn, remote_stream = await self.connect_remote()
+        remote_conn = await self.connect_remote()
         async with remote_conn, counter:
             await self._stream.write(self._make_resp())
-            await self.relay(remote_stream)
+            remote_stream = await self.get_remote_stream()
+            async with remote_stream:
+                await self.relay(remote_stream)
 
     def _make_resp(self, code=0):
         return b'\x05' + code.to_bytes(1, 'big') + b'\x00\x01\x00\x00\x00\x00\x00\x00'
@@ -424,17 +447,18 @@ class HTTPConnection(ServerBase):
             url = urllib.parse.urlparse(path)
             self.taddr = (url.hostname, url.port or 80)
             newpath = url._replace(netloc='', scheme='').geturl()
-        remote_conn, remote_stream = await self.connect_remote()
-        if method == 'CONNECT':
-            await self._stream.write(b'HTTP/1.1 200 Connection: Established\r\n\r\n')
-            remote_req_headers = None
-        else:
-            remote_req_headers = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode()
+        remote_conn = await self.connect_remote()
         async with remote_conn, counter:
-            if remote_req_headers:
-                # print(remote_req_headers.decode())
-                await remote_stream.write(remote_req_headers)
-            await self.relay(remote_stream)
+            if method == 'CONNECT':
+                await self._stream.write(b'HTTP/1.1 200 Connection: Established\r\n\r\n')
+                remote_req_headers = None
+            else:
+                remote_req_headers = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode()
+            remote_stream = await self.get_remote_stream()
+            async with remote_stream:
+                if remote_req_headers:
+                    await remote_stream.write(remote_req_headers)
+                await self.relay(remote_stream)
 
     async def _relay(self, rstream, wstream):
         try:
