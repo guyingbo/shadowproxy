@@ -177,7 +177,7 @@ class ServerBase(StreamWrapper):
         raise NotImplemented
 
     async def connect_remote(self):
-        if self.via:
+        if getattr(self, 'via', None):
             via_client = self.via()
             print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
                   f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]} '
