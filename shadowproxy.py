@@ -537,7 +537,7 @@ def get_server(uri):
             listen.kw['via'] = via
         host = listen.kw.pop('host')
         port = listen.kw.pop('port')
-        server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw))
+        server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024)
         print(f'listen on {host}:{port}')
         server_list.append(server)
     return server_list
