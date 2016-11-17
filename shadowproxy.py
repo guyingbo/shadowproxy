@@ -247,6 +247,7 @@ class RedirectConnection(ServerBase):
 class SSBase(StreamWrapper):
     async def read_exactly(self, nbytes):
         # patch for official shadowsocks
+        # because official shadowsocks send iv as late as possible
         if not hasattr(self, 'decrypter'):
             iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
             self.decrypter = self.cipher_cls(self.password, iv)
@@ -254,12 +255,18 @@ class SSBase(StreamWrapper):
 
     async def read(self, maxbytes=-1):
         # patch for official shadowsocks
+        # because official shadowsocks send iv as late as possible
         if not hasattr(self, 'decrypter'):
             iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
             self.decrypter = self.cipher_cls(self.password, iv)
         return self.decrypter.decrypt((await self._stream.read(maxbytes)))
 
     async def write(self, data):
+        # implement the same as official shadowsocks
+        # send iv as late as possible
+        if not hasattr(self, 'encrypter'):
+            self.encrypter = self.cipher_cls(self.password)
+            await self._stream.write(self.encrypter.iv)
         return await self._stream.write(self.encrypter.encrypt(data))
 
 
@@ -287,8 +294,9 @@ class SSConnection(ServerBase, SSBase):
     async def interact(self):
         iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
         self.decrypter = self.cipher_cls(self.password, iv)
-        self.encrypter = self.cipher_cls(self.password)
-        await self._stream.write(self.encrypter.iv)
+        # don't send iv from start
+        # self.encrypter = self.cipher_cls(self.password)
+        # await self._stream.write(self.encrypter.iv)
         self.taddr = await self.read_addr()
         remote_conn, remote_stream = await self.connect_remote()
         #print(f'Connecting {self.taddr[0]}:{self.taddr[1]} from {self.laddr[0]}:{self.laddr[1]}')
