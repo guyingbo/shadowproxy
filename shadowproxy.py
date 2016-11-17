@@ -192,9 +192,9 @@ class ServerBase(StreamWrapper):
             remote_conn = await curio.open_connection(*self.taddr)
         return remote_conn
 
-    async def get_remote_stream(self):
+    async def get_remote_stream(self, remote_conn):
         if self.via_client:
-            remote_stream = self.via_client.as_stream()
+            remote_stream = self.via_client.as_stream(remote_conn)
             try:
                 await remote_stream.client_init(self.taddr)
             except Exception as e:
@@ -253,7 +253,7 @@ class RedirectConnection(ServerBase):
     async def interact(self):
         remote_conn = await self.connect_remote()
         async with remote_conn, counter:
-            remote_stream = await self.get_remote_stream()
+            remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
 
@@ -317,7 +317,7 @@ class SSConnection(ServerBase, SSBase):
         self.taddr = await self.read_addr()
         remote_conn = await self.connect_remote()
         async with remote_conn, counter:
-            remote_stream = await self.get_remote_stream()
+            remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
 
@@ -349,12 +349,11 @@ class SSClient:
         self.raddr = (host, port)
 
     async def connect(self):
-        self.conn = await curio.open_connection(*self.raddr)
-        return self.conn
+        return (await curio.open_connection(*self.raddr))
 
-    def as_stream(self):
+    def as_stream(self, conn):
         stream = SSBase()
-        stream._stream = self.conn.as_stream()
+        stream._stream = conn.as_stream()
         stream.encrypter = self.cipher_cls(self.password)
         stream.cipher_cls = self.cipher_cls
         stream.password = self.password
@@ -386,7 +385,7 @@ class SocksConnection(ServerBase):
         remote_conn = await self.connect_remote()
         async with remote_conn, counter:
             await self._stream.write(self._make_resp())
-            remote_stream = await self.get_remote_stream()
+            remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
 
@@ -454,7 +453,7 @@ class HTTPConnection(ServerBase):
                 remote_req_headers = None
             else:
                 remote_req_headers = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode()
-            remote_stream = await self.get_remote_stream()
+            remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 if remote_req_headers:
                     await remote_stream.write(remote_req_headers)
