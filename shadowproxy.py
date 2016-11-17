@@ -264,9 +264,10 @@ class SSBase(StreamWrapper):
 
 
 class SSConnection(ServerBase, SSBase):
-    def __init__(self, cipher_cls, password):
+    def __init__(self, cipher_cls, password, via=None):
         self.cipher_cls = cipher_cls
         self.password = password
+        self.via = via
 
     async def relay(self, remote_stream):
         async with remote_stream, self:
