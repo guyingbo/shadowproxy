@@ -541,7 +541,7 @@ async def stats():
 
 def main():
     parser = argparse.ArgumentParser(description=__description__)
-    parser.add_argument('-v', dest='verbose', action='count', help='print verbose output')
+    parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument('--pdb', dest='pdb', action='store_true')
     parser.add_argument('server', nargs='+', type=get_server)
