@@ -1,9 +1,11 @@
+# part of http proxy copy from: https://github.com/qwj/python-proxy/blob/master/pproxy/proto.py
 from Crypto import Random
 from Crypto.Cipher import AES
 from hashlib import md5
-from curio import run, spawn, tcp_server, socket, CancelledError, queue
+from curio import run, spawn, tcp_server, socket, CancelledError, queue, sleep
 from functools import partial
 import urllib.parse
+import traceback
 import argparse
 import struct
 import types
@@ -12,6 +14,19 @@ import sys
 import re
 __version__ = '0.1.0'
 __description__ = 'Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.'
+verbose = 0
+
+
+class AsyncCounter:
+    def __init__(self, num=0):
+        self.num = num
+
+    async def __aenter__(self):
+        self.num += 1
+
+    async def __aexit__(self, *args):
+        self.num -= 1
+counter = AsyncCounter()
 
 
 class wait:
@@ -145,17 +160,17 @@ class ServerBase(StreamWrapper):
 
     async def __call__(self, client, addr):
         try:
-            async with client:
+            async with client, counter:
                 self.setup(client.as_stream(), addr)
                 async with self:
                     await self.interact()
         except Exception as e:
-            if hasattr(self, 'taddr'):
-                print(f'{self.taddr[0]}:{self.taddr[1]}', e)
-            else:
-                print(e)
-            if not isinstance(e, OSError):
-                import traceback
+            if verbose > 0:
+                if hasattr(self, 'taddr'):
+                    print(f'{self.taddr[0]}:{self.taddr[1]}', e)
+                else:
+                    print(e)
+            if verbose > 1:
                 traceback.print_exc()
 
     async def interact(self):
@@ -194,18 +209,13 @@ class ServerBase(StreamWrapper):
                 if not data:
                     return
                 await wstream.write(data)
-        except ConnectionResetError as e:
-            print(f'{self.taddr[0]}:{self.taddr[1]} fail to read from {rstream}', e)
-        except BrokenPipeError as e:
-            print(f'{self.taddr[0]}:{self.taddr[1]} fail to write to: {wstream}', e)
-            return e
-        except (CancelledError, TimeoutError):
+        except CancelledError:
             pass
         except Exception as e:
-            if isinstance(e, EOFError):
-                print(e)
-            import traceback
-            traceback.print_exc()
+            if verbose > 0:
+                print(f'{self.taddr[0]}:{self.taddr[1]} error:', e)
+            if verbose > 1:
+                traceback.print_exc()
 
     _relay2 = _relay
 
@@ -222,14 +232,15 @@ class RedirectConnection(ServerBase):
             port, host = struct.unpack('!2xH4s8x', buf)
             self.taddr = (socket.inet_ntoa(host), port)
         except Exception as e:
-            print("It seems not been a proxy connection:", e, 'bye.')
+            if verbose > 0:
+                print("It seems not been a proxy connection:", e, 'bye.')
             await client.close()
             return
         return (await super().__call__(client, addr))
 
     async def interact(self):
         remote_conn, remote_stream = await self.connect_remote()
-        async with remote_conn:
+        async with remote_conn, counter:
             await self.relay(remote_stream)
 
 
@@ -278,10 +289,10 @@ class SSConnection(ServerBase, SSBase):
         self.encrypter = self.cipher_cls(self.password)
         await self._stream.write(self.encrypter.iv)
         self.taddr = await self.read_addr()
-        remote_conn, remote_stream = self.connect_remote()
+        remote_conn, remote_stream = await self.connect_remote()
         #print(f'Connecting {self.taddr[0]}:{self.taddr[1]} from {self.laddr[0]}:{self.laddr[1]}')
         #remote_conn = await curio.open_connection(*self.taddr)
-        async with remote_conn:
+        async with remote_conn, counter:
             #remote_stream = remote_conn.as_stream()
             await self.relay(remote_stream)
 
@@ -355,7 +366,7 @@ class SocksConnection(ServerBase):
         #    print(f'Connecting {self.taddr[0]}:{self.taddr[1]} from {self.laddr[0]}:{self.laddr[1]}')
         #    remote_conn = await curio.open_connection(*self.taddr)
         #    remote_stream = remote_conn.as_stream()
-        async with remote_conn:
+        async with remote_conn, counter:
             await self._stream.write(self._make_resp())
             await self.relay(remote_stream)
 
@@ -422,7 +433,7 @@ class HTTPConnection(ServerBase):
             remote_req_headers = None
         else:
             remote_req_headers = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode()
-        async with remote_conn:
+        async with remote_conn, counter:
             if remote_req_headers:
                 # print(remote_req_headers.decode())
                 await remote_stream.write(remote_req_headers)
@@ -446,18 +457,13 @@ class HTTPConnection(ServerBase):
                     newpath = url._replace(netloc='', scheme='').geturl()
                     data = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode() + data
                 await wstream.write(data)
-        except ConnectionResetError as e:
-            print(f'{self.taddr[0]}:{self.taddr[1]} fail to read from {rstream}', e)
-        except BrokenPipeError as e:
-            print(f'{self.taddr[0]}:{self.taddr[1]} fail to write to: {wstream}', e)
-            return e
-        except (CancelledError, TimeoutError):
+        except CancelledError:
             pass
         except Exception as e:
-            if isinstance(e, EOFError):
-                print(e)
-            import traceback
-            traceback.print_exc()
+            if verbose > 0:
+                print(f'{self.taddr[0]}:{self.taddr[1]} error:', e)
+            if verbose > 1:
+                traceback.print_exc()
 
 
 class SSUDPServer:
@@ -523,7 +529,14 @@ async def multi_server(*servers):
         for server in server_list:
             task = await spawn(server)
             tasks.append(task)
+    tasks.append((await spawn(stats())))
     await curio.gather(tasks)
+
+
+async def stats():
+    while True:
+        print('Current connections: ', counter.num)
+        await sleep(10)
 
 
 def main():
@@ -533,6 +546,8 @@ def main():
     parser.add_argument('--pdb', dest='pdb', action='store_true')
     parser.add_argument('server', nargs='+', type=get_server)
     args = parser.parse_args()
+    global verbose
+    verbose = args.verbose
     try:
         run(multi_server(*args.server), pdb=args.pdb)
     except KeyboardInterrupt:
