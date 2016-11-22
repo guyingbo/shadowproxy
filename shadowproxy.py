@@ -1,4 +1,3 @@
-# part of http proxy copy from: https://github.com/qwj/python-proxy/blob/master/pproxy/proto.py
 from Crypto import Random
 from Crypto.Cipher import AES
 from hashlib import md5
@@ -15,6 +14,9 @@ import re
 import os
 __version__ = '0.1.0'
 __description__ = '''Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.
+Thanks to Dabeaz for his awesome curio project: https://github.com/dabeaz/curio
+This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
+
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[{=remote_scheme}://[cipher:password@]{netloc}]
 support schemes:
   local_scheme:   socks, ss, red, http, udpss(udp)
