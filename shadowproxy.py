@@ -12,8 +12,16 @@ import types
 import curio
 import sys
 import re
+import os
 __version__ = '0.1.0'
-__description__ = 'Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.'
+__description__ = '''Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.
+uri syntax: {local_scheme}://[cipher:password@]{netloc}[{=remote_scheme}://[cipher:password@]{netloc}]
+support schemes:
+  local_scheme:   socks, ss, red, http, udpss(udp)
+  remote_scheme:  ss
+
+example: python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888 ss://aes-256-cfb:password@:8888 udpss://aes-256-cfb:password@:8527
+'''
 verbose = 0
 
 
@@ -84,8 +92,6 @@ class wait:
         self._tasks = []
 
 
-#IPV4 = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
-#IPV6 = re.compile(r'')
 def pack_addr(addr):
     host, port = addr
     try: # IPV4
@@ -154,6 +160,13 @@ class StreamWrapper:
 
 
 class ServerBase(StreamWrapper):
+    @property
+    def __proto__(self):
+        proto = self.__class__.__name__[:-10]
+        if getattr(self, 'command', None) == 'associate':
+            proto += '(UDP)'
+        return proto
+
     def setup(self, stream, addr):
         self._stream = stream
         self.laddr = addr
@@ -181,14 +194,14 @@ class ServerBase(StreamWrapper):
             self.via_client = self.via()
             if verbose > 0:
                 print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
-                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]} '
+                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__} '
                       f'via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}')
             remote_conn = await self.via_client.connect()
         else:
             self.via_client = None
             if verbose > 0:
                 print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
-                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__class__.__name__[:-10]}')
+                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__}')
             remote_conn = await curio.open_connection(*self.taddr)
         return remote_conn
 
@@ -281,7 +294,8 @@ class SSBase(StreamWrapper):
         if not hasattr(self, 'encrypter'):
             self.encrypter = self.cipher_cls(self.password)
             await self._stream.write(self.encrypter.iv)
-        return await self._stream.write(self.encrypter.encrypt(data))
+        await self._stream.write(self.encrypter.encrypt(data))
+        await self._stream.flush()
 
     async def client_init(self, taddr):
         await self._stream.write(self.encrypter.iv)
@@ -323,16 +337,13 @@ class SSConnection(ServerBase, SSBase):
 
     async def read_addr(self):
         atyp = await self.read_exactly(1)
-        if atyp == b'\x01':
-            # IPV4
+        if atyp == b'\x01':     # IPV4
             ipv4 = await self.read_exactly(4)
             host = socket.inet_ntoa(ipv4)
-        elif atyp == b'\x04':
-            # IPV6
+        elif atyp == b'\x04':   # IPV6
             ipv6 = await self.read_exactly(16)
             host = socket.inet_ntop(socket.AF_INET6, ipv6)
-        elif atyp == b'\x03':
-            # hostname
+        elif atyp == b'\x03':   # hostname
             length = (await self.read_exactly(1))[0]
             hostname = await self.read_exactly(length)
             host = hostname.decode('ascii')
@@ -375,13 +386,14 @@ class SocksConnection(ServerBase):
         await self._stream.write(b'\x05\x00')
         ver, cmd, rsv, atyp = struct.unpack('!BBBB', (await self._stream.read_exactly(4)))
         try:
-            command = {1: 'connect', 2: 'bind', 3: 'associate'}[cmd]
-            if command != 'connect':
-                print(command)
+            self.command = {1: 'connect', 2: 'bind', 3: 'associate'}[cmd]
         except KeyError:
             raise Exception(f'unknown cmd: {cmd}') from None
         host, port, data = await self.read_addr(atyp)
         self.taddr = (host, port)
+        return await getattr(self, 'cmd_' + self.command)()
+
+    async def cmd_connect(self):
         remote_conn = await self.connect_remote()
         async with remote_conn, counter:
             await self._stream.write(self._make_resp())
@@ -389,23 +401,50 @@ class SocksConnection(ServerBase):
             async with remote_stream:
                 await self.relay(remote_stream)
 
-    def _make_resp(self, code=0):
-        return b'\x05' + code.to_bytes(1, 'big') + b'\x00\x01\x00\x00\x00\x00\x00\x00'
+    async def cmd_associate(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.bind(('', 0))
+            host, port = sock.getsockname()
+            async with sock:
+                await self._stream.write(self._make_resp(host=host, port=port))
+                task = await spawn(self.relay_udp(sock))
+                while True:
+                    data = self._stream.read()
+                    if not data:
+                        await task.cancel()
+                        return
+                    if verbose > 0:
+                        print('receive unexpect data:', data)
+        except:
+            sock._socket.close()
 
-    def _make_bind_resp(self, addr, port):
-        return
+    async def relay_udp(self, sock):
+        while True:
+            data, addr = await sock.recvfrom(8192)
+            try:
+                await handler_task(data, addr)
+            except CancelledError:
+                return
+            except Exception as e:
+                if verbose > 0:
+                    print(e)
+                if verbose > 1:
+                    traceback.print_exc()
+
+
+    def _make_resp(self, code=0, host='0.0.0.0', port=0):
+        return b'\x05' + code.to_bytes(1, 'big') + b'\x00' + \
+               pack_addr((host, port))
 
     async def read_addr(self, atyp):
-        if atyp == 1:
-            # IPV4
+        if atyp == 1:   # IPV4
             data = await self._stream.read_exactly(4)
             host = socket.inet_ntoa(data)
-        elif atyp == 4:
-            # IPV6
+        elif atyp == 4: # IPV6
             data = await self._stream.read_exactly(16)
             host = socket.inet_ntop(socket.AF_INET6, data)
-        elif atyp == 3:
-            # hostname
+        elif atyp == 3: # hostname
             data = (await self._stream.read_exactly(1))
             data += await self._stream.read_exactly(data[0])
             host = data[1:].decode('ascii')
@@ -486,16 +525,59 @@ class HTTPConnection(ServerBase):
                 traceback.print_exc()
 
 
-class SSUDPServer:
-    def __init__(self, cipher_cls):
-        self.cipher_cls = cipher_cls
+async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_address=True):
+    sock = socket.socket(family, socket.SOCK_DGRAM)
+    try:
+        sock.bind((host, port))
+        if reuse_address:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+        async with sock:
+            while True:
+                data, addr = await sock.recvfrom(8192)
+                try:
+                    await handler_task(data, addr)
+                except Exception as e:
+                    if verbose > 0:
+                        print(e)
+                    if verbose > 1:
+                        traceback.print_exc()
+    except Exception:
+        sock._socket.close()
+        raise
 
-    async def serve(addr):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGARM)
-        sock.bind(addr)
-        while True:
-            data, addr = await sock.recvfrom(8192)
-            iv = data[:self.cipher_cls.IV_LENGTH]
+
+
+class UDPSSServer:
+    def __init__(self, cipher_cls, password):
+        self.cipher_cls = cipher_cls
+        self.password = password
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    async def __call__(self, data, addr):
+        iv = data[:self.cipher_cls.IV_LENGTH]
+        decrypter = self.cipher_cls(self.password, iv=iv)
+        payload = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
+        atyp = payload[0]
+        if atyp == 1:   # IPV4
+            epos = 5
+            ipv4 = payload[1:epos]
+            host = socket.inet_ntoa(ipv4)
+        elif atyp == 4: # IPV6
+            epos = 17
+            ipv6 = payload[1:epos]
+            host = socket.inet_ntop(socket.AF_INET6, ipv6)
+        elif atyp == 3: # hostname
+            length = payload[1]
+            epos = 2 + length
+            host = payload[2:epos].decode('ascii')
+        else:
+            raise Exception(f'unknow atyp: {atyp}') from None
+        port = int.from_bytes(payload[epos:epos+2], 'big')
+        taddr = (host, port)
+        payload = payload[epos+2:]
+        while payload:
+            nbytes = await self.sock.sendto(payload, taddr)
+            payload = payload[nbytes:]
 
 
 protos = {
@@ -504,6 +586,7 @@ protos = {
     'socks': SocksConnection,
     'red': RedirectConnection,
     'ssr': SSClient,
+    'udpss': UDPSSServer,
 }
 def uri_compile(uri):
     url = urllib.parse.urlparse(uri)
@@ -517,11 +600,11 @@ def uri_compile(uri):
     if loc:
         kw['host'], _, port = loc.partition(':')
         kw['port'] = int(port) if port else 1080
-    return types.SimpleNamespace(proto=proto, kw=kw)
+    return types.SimpleNamespace(proto=proto, scheme=url.scheme, kw=kw)
 
 
 def get_server(uri):
-    listen_uris, _, remote_uri = uri.partition('+')
+    listen_uris, _, remote_uri = uri.partition('=')
     listen_uris = listen_uris.split(',')
     if not listen_uris:
         raise ValueError('no server found')
@@ -537,19 +620,33 @@ def get_server(uri):
             listen.kw['via'] = via
         host = listen.kw.pop('host')
         port = listen.kw.pop('port')
-        server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024)
-        print(f'listen on {host}:{port}')
-        server_list.append(server)
+        if listen.scheme in ('ss', 'udpss') and 'cipher_cls' not in listen.kw:
+            raise argparse.ArgumentTypeError('you need to assign cryto algorithm and password: '
+                                             f'{listen.scheme}://{host}:{port}')
+        if listen.scheme.startswith('udp'):
+            server = udp_server(host, port, listen.proto(**listen.kw))
+        else:
+            server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024)
+        server_list.append((server, (host, port), listen.scheme))
     return server_list
 
 
 async def multi_server(*servers):
     tasks = []
+    addrs = []
     for server_list in servers:
-        for server in server_list:
+        for server, addr, scheme in server_list:
             task = await spawn(server)
             tasks.append(task)
-    tasks.append((await spawn(stats())))
+            addrs.append((*addr, scheme))
+    address = ', '.join(f'{scheme}://{host}:{port}' for host, port, scheme in addrs)
+    ss_filter = 'or '.join(f'dport = {port}' for host, port, scheme in addrs)
+    pid = os.getpid()
+    if verbose > 0:
+        print(f'listen on {address} pid: {pid}')
+        print(f'lsof -p {pid} -P | grep TCP')
+        print(f'ss -o "( {ss_filter} )"')
+    #tasks.append((await spawn(stats())))
     await curio.gather(tasks)
 
 
@@ -560,7 +657,7 @@ async def stats():
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__description__)
+    parser = argparse.ArgumentParser(description=__description__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument('--pdb', dest='pdb', action='store_true')
