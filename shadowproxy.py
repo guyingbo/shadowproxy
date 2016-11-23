@@ -14,7 +14,7 @@ import re
 import os
 __version__ = '0.1.0'
 __description__ = '''Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.
-Thanks to Dabeaz for his awesome curio project: https://github.com/dabeaz/curio
+Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
 This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
 
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[{=remote_scheme}://[cipher:password@]{netloc}]
@@ -105,6 +105,26 @@ def pack_addr(addr):
             packed = host.encode('ascii')
             packed = b'\x03' + len(packed).to_bytes(1, 'big') + packed
     return packed + port.to_bytes(2, 'big')
+
+
+def unpack_addr(data, start=0):
+    atyp = data[start]
+    if atyp == 1:   # IPV4
+        end = start + 5
+        ipv4 = data[start+1:end]
+        host = socket.inet_ntoa(ipv4)
+    elif atyp == 4: # IPV6
+        end = start + 17
+        ipv6 = data[start:end]
+        host = socket.inet_ntop(socket.AF_INET6, ipv6)
+    elif atyp == 3: # hostname
+        length = data[start+1]
+        end = start + 2 + length
+        host = data[start+2:end].decode('ascii')
+    else:
+        raise Exception(f'unknow atyp: {atyp}') from None
+    port = int.from_bytes(data[end:end+2], 'big')
+    return (host, port), data[end+2:]
 
 
 readfunc = Random.new().read
@@ -392,7 +412,10 @@ class SocksConnection(ServerBase):
         except KeyError:
             raise Exception(f'unknown cmd: {cmd}') from None
         host, port, data = await self.read_addr(atyp)
-        self.taddr = (host, port)
+        if self.command == 'associate':
+            self.taddr = (self.laddr[0], port)
+        else:
+            self.taddr = (host, port)
         return await getattr(self, 'cmd_' + self.command)()
 
     async def cmd_connect(self):
@@ -412,7 +435,7 @@ class SocksConnection(ServerBase):
                 await self._stream.write(self._make_resp(host=host, port=port))
                 task = await spawn(self.relay_udp(sock))
                 while True:
-                    data = self._stream.read()
+                    data = await self._stream.read()
                     if not data:
                         await task.cancel()
                         return
@@ -423,9 +446,17 @@ class SocksConnection(ServerBase):
 
     async def relay_udp(self, sock):
         while True:
-            data, addr = await sock.recvfrom(8192)
             try:
-                await handler_task(data, addr)
+                data, addr = await sock.recvfrom(8192)
+                print(data, addr, self.taddr)
+                if addr == self.taddr:
+                    taddr, data = unpack_addr(data, 3)
+                    address = taddr
+                else:
+                    address = self.taddr
+                while data:
+                    nbytes = await sock.sendto(data, address)
+                    data = data[nbytes:]
             except CancelledError:
                 return
             except Exception as e:
@@ -548,7 +579,6 @@ async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_a
         raise
 
 
-
 class UDPSSServer:
     def __init__(self, cipher_cls, password):
         self.cipher_cls = cipher_cls
@@ -559,24 +589,8 @@ class UDPSSServer:
         iv = data[:self.cipher_cls.IV_LENGTH]
         decrypter = self.cipher_cls(self.password, iv=iv)
         payload = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
-        atyp = payload[0]
-        if atyp == 1:   # IPV4
-            epos = 5
-            ipv4 = payload[1:epos]
-            host = socket.inet_ntoa(ipv4)
-        elif atyp == 4: # IPV6
-            epos = 17
-            ipv6 = payload[1:epos]
-            host = socket.inet_ntop(socket.AF_INET6, ipv6)
-        elif atyp == 3: # hostname
-            length = payload[1]
-            epos = 2 + length
-            host = payload[2:epos].decode('ascii')
-        else:
-            raise Exception(f'unknow atyp: {atyp}') from None
-        port = int.from_bytes(payload[epos:epos+2], 'big')
+        host, port, payload = unpack_addr(data)
         taddr = (host, port)
-        payload = payload[epos+2:]
         while payload:
             nbytes = await self.sock.sendto(payload, taddr)
             payload = payload[nbytes:]
