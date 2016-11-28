@@ -157,16 +157,6 @@ class AES256CFBCipher(BaseCipher):
         self.cipher = AES.new(self.key, mode=AES.MODE_CFB, iv=self.iv, segment_size=128)
 
 
-class ProtoFactory:
-    def __init__(self, cls, *args, **kwargs):
-        self.cls = cls
-        self.args = args
-        self.kwargs = kwargs
-
-    async def __call__(self, client, addr):
-        return await self.cls(*self.args, **self.kwargs)(client, addr)
-
-
 class StreamWrapper:
     def __repr__(self):
         return '<{} {}>'.format(self.__class__.__name__, self._stream)
@@ -664,6 +654,12 @@ async def multi_server(*servers):
         print(f'ss -o "( {ss_filter} )"')
     #tasks.append((await spawn(stats())))
     await curio.gather(tasks)
+
+
+def ProtoFactory(cls, *args, **kwargs):
+    async def client_handler(client, addr):
+        return await cls(*args, **kwargs)(client, addr)
+    return client_handler
 
 
 async def stats():
