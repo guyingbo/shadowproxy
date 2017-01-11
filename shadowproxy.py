@@ -157,21 +157,10 @@ class AES256CFBCipher(BaseCipher):
         self.cipher = AES.new(self.key, mode=AES.MODE_CFB, iv=self.iv, segment_size=128)
 
 
-class StreamWrapper:
+class ServerBase:
     def __repr__(self):
         return '<{} {}>'.format(self.__class__.__name__, self._stream)
 
-    async def close(self):
-        await self._stream.close()
-
-    async def __aenter__(self):
-        await self._stream.__aenter__()
-
-    async def __aexit__(self, *args):
-        await self._stream.__aexit__(*args)
-
-
-class ServerBase(StreamWrapper):
     @property
     def __proto__(self):
         proto = self.__class__.__name__[:-10]
@@ -187,7 +176,7 @@ class ServerBase(StreamWrapper):
         try:
             async with client, counter:
                 self.setup(client.as_stream(), addr)
-                async with self:
+                async with self._stream:
                     await self.interact()
         except Exception as e:
             if verbose > 0:
@@ -283,7 +272,19 @@ class RedirectConnection(ServerBase):
                 await self.relay(remote_stream)
 
 
-class SSBase(StreamWrapper):
+class SSBase:
+    def __repr__(self):
+        return '<{} {}>'.format(self.__class__.__name__, self._stream)
+
+    async def close(self):
+        await self._stream.close()
+
+    async def __aenter__(self):
+        await self._stream.__aenter__()
+
+    async def __aexit__(self, *args):
+        await self._stream.__aexit__(*args)
+
     async def read_exactly(self, nbytes):
         # patch for official shadowsocks
         # because official shadowsocks send iv as late as possible
