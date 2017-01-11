@@ -206,6 +206,17 @@ class ServerBase:
             remote_conn = await curio.open_connection(*self.taddr)
         return remote_conn
 
+    def on_disconnect_remote(self):
+        if getattr(self, 'via', None):
+            if verbose > 0:
+                print(f'Disconnect {self.taddr[0]}:{self.taddr[1]} '
+                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__} '
+                      f'via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}')
+        else:
+            if verbose > 0:
+                print(f'Disconnect {self.taddr[0]}:{self.taddr[1]} '
+                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__}')
+
     async def get_remote_stream(self, remote_conn):
         if self.via_client:
             remote_stream = self.via_client.as_stream(remote_conn)
@@ -270,6 +281,7 @@ class RedirectConnection(ServerBase):
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
+        self.on_disconnect_remote()
 
 
 class SSBase:
@@ -347,6 +359,7 @@ class SSConnection(ServerBase, SSBase):
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
+        self.on_disconnect_remote()
 
     async def read_addr(self):
         atyp = await self.read_exactly(1)
@@ -416,6 +429,7 @@ class SocksConnection(ServerBase):
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
+        self.on_disconnect_remote()
 
     async def cmd_associate(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -521,6 +535,7 @@ class HTTPConnection(ServerBase):
                 if remote_req_headers:
                     await remote_stream.write(remote_req_headers)
                 await self.relay(remote_stream)
+        self.on_disconnect_remote()
 
     async def _relay(self, rstream, wstream):
         try:
