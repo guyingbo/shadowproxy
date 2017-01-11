@@ -1,11 +1,15 @@
 from Crypto import Random
 from Crypto.Cipher import AES
 from hashlib import md5
-from curio import run, spawn, tcp_server, socket, CancelledError, queue, sleep
+from curio import spawn, tcp_server, socket, CancelledError, queue
+from curio.signal import SignalSet
 from functools import partial
+import time
 import urllib.parse
 import traceback
 import argparse
+import weakref
+import signal
 import struct
 import types
 import curio
@@ -25,18 +29,30 @@ support schemes:
 example: python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888 ss://aes-256-cfb:password@:8888 udpss://aes-256-cfb:password@:8527
 '''
 verbose = 0
+remote_num = 0
+print = partial(print, flush=True)
 
 
-class AsyncCounter:
-    def __init__(self, num=0):
-        self.num = num
+class Stats:
+    def __init__(self):
+        self.reset()
 
-    async def __aenter__(self):
-        self.num += 1
+    def __repr__(self):
+        self.speed = self.value / (time.time() - self.start)
+        if self.speed < 1024:
+            return f'{self.speed:.0f} B/s'
+        elif self.speed < 1048576:
+            return f'{self.speed/1024:.0f} KB/s'
+        else:
+            return f'{self.speed/1048576:.0f} MB/s'
 
-    async def __aexit__(self, *args):
-        self.num -= 1
-counter = AsyncCounter()
+    def add(self, v):
+        self.value += v
+
+    def reset(self):
+        self.start = time.time()
+        self.value = 0
+        self.speed = 0
 
 
 class wait:
@@ -159,7 +175,15 @@ class AES256CFBCipher(BaseCipher):
 
 class ServerBase:
     def __repr__(self):
-        return '<{} {}>'.format(self.__class__.__name__, self._stream)
+        if hasattr(self, 'taddr'):
+            target_host, target_port = self.taddr
+        else:
+            target_host, target_port = 'unknown', -1
+        s = f'{self.taddr[0]}:{self.taddr[1]} ' \
+            f'from {self.__proto__}:{self.laddr[0]}:{self.laddr[1]}'
+        if hasattr(self, 'via_client'):
+            s += f' via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
+        return s
 
     @property
     def __proto__(self):
@@ -174,7 +198,7 @@ class ServerBase:
 
     async def __call__(self, client, addr):
         try:
-            async with client, counter:
+            async with client:
                 self.setup(client.as_stream(), addr)
                 async with self._stream:
                     await self.interact()
@@ -191,31 +215,31 @@ class ServerBase:
         raise NotImplemented
 
     async def connect_remote(self):
+        self.stats = Stats()
+        global remote_num
+        remote_num += 1
         if getattr(self, 'via', None):
             self.via_client = self.via()
             if verbose > 0:
-                print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
-                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__} '
-                      f'via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}')
+                print(f'Connecting {self} {remote_num}')
             remote_conn = await self.via_client.connect()
         else:
             self.via_client = None
             if verbose > 0:
-                print(f'Connecting {self.taddr[0]}:{self.taddr[1]} '
-                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__}')
+                print(f'Connecting {self} {remote_num}')
             remote_conn = await curio.open_connection(*self.taddr)
         return remote_conn
 
     def on_disconnect_remote(self):
+        global remote_num
+        remote_num -= 1
         if getattr(self, 'via', None):
             if verbose > 0:
-                print(f'Disconnect {self.taddr[0]}:{self.taddr[1]} '
-                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__} '
-                      f'via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}')
+                print(f'Disconnect {self} ({self.stats})')
         else:
             if verbose > 0:
-                print(f'Disconnect {self.taddr[0]}:{self.taddr[1]} '
-                      f'from {self.laddr[0]}:{self.laddr[1]},{self.__proto__}')
+                print(f'Disconnect {self} ({self.stats})')
+        # self.stats.reset()
 
     async def get_remote_stream(self, remote_conn):
         if self.via_client:
@@ -246,6 +270,7 @@ class ServerBase:
                 if not data:
                     return
                 await wstream.write(data)
+                self.stats.add(len(data))
         except CancelledError:
             pass
         except Exception as e:
@@ -277,7 +302,7 @@ class RedirectConnection(ServerBase):
 
     async def interact(self):
         remote_conn = await self.connect_remote()
-        async with remote_conn, counter:
+        async with remote_conn:
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
@@ -355,7 +380,7 @@ class SSConnection(ServerBase, SSBase):
         # await self._stream.write(self.encrypter.iv)
         self.taddr = await self.read_addr()
         remote_conn = await self.connect_remote()
-        async with remote_conn, counter:
+        async with remote_conn:
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
@@ -424,7 +449,7 @@ class SocksConnection(ServerBase):
 
     async def cmd_connect(self):
         remote_conn = await self.connect_remote()
-        async with remote_conn, counter:
+        async with remote_conn:
             await self._stream.write(self._make_resp())
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
@@ -524,7 +549,7 @@ class HTTPConnection(ServerBase):
             self.taddr = (url.hostname, url.port or 80)
             newpath = url._replace(netloc='', scheme='').geturl()
         remote_conn = await self.connect_remote()
-        async with remote_conn, counter:
+        async with remote_conn:
             if method == 'CONNECT':
                 await self._stream.write(b'HTTP/1.1 200 Connection: Established\r\n\r\n')
                 remote_req_headers = None
@@ -555,6 +580,7 @@ class HTTPConnection(ServerBase):
                     newpath = url._replace(netloc='', scheme='').geturl()
                     data = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode() + data
                 await wstream.write(data)
+                self.stats.add(len(data))
         except CancelledError:
             pass
         except Exception as e:
@@ -666,35 +692,52 @@ async def multi_server(*servers):
     pid = os.getpid()
     if verbose > 0:
         print(f'listen on {address} pid: {pid}')
-        print(f'lsof -p {pid} -P | grep TCP')
+        print(f'sudo lsof -p {pid} -P | grep -e TCP -e STREAM')
         print(f'ss -o "( {ss_filter} )"')
-    #tasks.append((await spawn(stats())))
+    tasks.append((await spawn(show_stats())))
     await curio.gather(tasks)
 
 
+connections = weakref.WeakSet()
 def ProtoFactory(cls, *args, **kwargs):
     async def client_handler(client, addr):
-        return await cls(*args, **kwargs)(client, addr)
+        handler = cls(*args, **kwargs)
+        connections.add(handler)
+        return await handler(client, addr)
     return client_handler
 
 
-async def stats():
+async def show_stats():
     while True:
-        print('Current connections: ', counter.num)
-        await sleep(10)
+        async with SignalSet(signal.SIGUSR1) as sig:
+            pid = os.getpid()
+            print(f'kill -USR1 {pid} to show connections')
+            signo = await sig.wait()
+            if not connections:
+                print('no connections')
+            for conn in connections:
+                print('|', conn)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__description__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
-    parser.add_argument('--pdb', dest='pdb', action='store_true')
+    parser.add_argument('--monitor', dest='monitor', action='store_true')
     parser.add_argument('server', nargs='+', type=get_server)
     args = parser.parse_args()
     global verbose
     verbose = args.verbose
     try:
-        run(multi_server(*args.server), pdb=args.pdb)
+        while True:
+            kernel = curio.Kernel(with_monitor=args.monitor)
+            try:
+                kernel.run(multi_server(*args.server))
+            except Exception as e:
+                traceback.print_exc()
+                for conn in connections:
+                    print('|', conn)
+            time.sleep(0.1)
     except KeyboardInterrupt:
         pass
 
