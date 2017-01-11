@@ -728,16 +728,13 @@ def main():
     args = parser.parse_args()
     global verbose
     verbose = args.verbose
+    kernel = curio.Kernel(with_monitor=args.monitor)
     try:
-        while True:
-            kernel = curio.Kernel(with_monitor=args.monitor)
-            try:
-                kernel.run(multi_server(*args.server))
-            except Exception as e:
-                traceback.print_exc()
-                for conn in connections:
-                    print('|', conn)
-            time.sleep(0.1)
+        kernel.run(multi_server(*args.server))
+    except Exception as e:
+        traceback.print_exc()
+        for conn in connections:
+            print('|', conn, file=sys.stderr)
     except KeyboardInterrupt:
         pass
 
