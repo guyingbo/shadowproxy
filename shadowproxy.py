@@ -126,7 +126,7 @@ class ServerBase:
             target_host, target_port = 'unknown', -1
         s = f'{self.taddr[0]}:{self.taddr[1]} ' \
             f'from {self.__proto__}:{self.laddr[0]}:{self.laddr[1]}'
-        if hasattr(self, 'via_client'):
+        if getattr(self, 'via_client', None):
             s += f' via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
         return s
 
@@ -679,7 +679,7 @@ def main():
     except Exception as e:
         traceback.print_exc()
         for k, v in kernel._selector.get_map().items():
-            print(k, v)
+            print(k, v, file=sys.stderr)
         for conn in connections:
             print('|', conn, file=sys.stderr)
     except KeyboardInterrupt:
