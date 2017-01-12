@@ -38,13 +38,22 @@ class Stats:
         self.reset()
 
     def __repr__(self):
-        self.speed = self.value / (time.time() - self.start)
-        if self.speed < 1024:
-            return f'{self.speed:.0f} B/s'
-        elif self.speed < 1048576:
-            return f'{self.speed/1024:.0f} KB/s'
+        t = int(time.time() - self.start)
+        if self.value < 1024:
+            return f'{self.value:d}Bytes in {t}s'
+        elif self.value < 1048576:
+            return f'{self.value//1024:d}KB in {t}s'
         else:
-            return f'{self.speed/1048576:.0f} MB/s'
+            return f'{self.value/1048576:.1f}MB in {t}s'
+
+    def get_speed(self):
+        speed = self.value / (time.time() - self.start)
+        if speed < 1024:
+            return f'{speed:.0f} B/s'
+        elif speed < 1048576:
+            return f'{speed/1024:.0f} KB/s'
+        else:
+            return f'{speed/1048576:.0f} MB/s'
 
     def add(self, v):
         self.value += v
@@ -52,7 +61,7 @@ class Stats:
     def reset(self):
         self.start = time.time()
         self.value = 0
-        self.speed = 0
+total_stats = Stats()
 
 
 def pack_addr(addr):
@@ -166,12 +175,12 @@ class ServerBase:
         if getattr(self, 'via', None):
             self.via_client = self.via()
             if verbose > 0:
-                print(f'Connecting {self} {remote_num}')
+                print(f'Connecting {self}')
             remote_conn = await self.via_client.connect()
         else:
             self.via_client = None
             if verbose > 0:
-                print(f'Connecting {self} {remote_num}')
+                print(f'Connecting {self}')
             remote_conn = await curio.open_connection(*self.taddr)
         return remote_conn
 
@@ -216,6 +225,7 @@ class ServerBase:
                     return
                 await wstream.write(data)
                 self.stats.add(len(data))
+                total_stats.add(len(data))
         except CancelledError:
             pass
         except Exception as e:
@@ -526,6 +536,7 @@ class HTTPConnection(ServerBase):
                     data = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode() + data
                 await wstream.write(data)
                 self.stats.add(len(data))
+                total_stats.add(len(data))
         except CancelledError:
             pass
         except Exception as e:
@@ -653,15 +664,15 @@ def ProtoFactory(cls, *args, **kwargs):
 
 
 async def show_stats():
+    pid = os.getpid()
+    print(f'kill -USR1 {pid} to show connections')
     while True:
         async with SignalSet(signal.SIGUSR1) as sig:
-            pid = os.getpid()
-            print(f'kill -USR1 {pid} to show connections')
             signo = await sig.wait()
-            if not connections:
-                print('no connections')
             for conn in connections:
                 print('|', conn)
+            print('-'*20, f'{total_stats} ( {total_stats.get_speed()} )', '-'*20)
+            total_stats.reset()
 
 
 def main():
