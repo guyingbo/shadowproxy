@@ -1,7 +1,7 @@
 from Crypto import Random
 from Crypto.Cipher import AES
 from hashlib import md5
-from curio import spawn, tcp_server, socket, CancelledError, queue
+from curio import spawn, tcp_server, socket, CancelledError, wait
 from curio.signal import SignalSet
 from functools import partial
 import time
@@ -53,61 +53,6 @@ class Stats:
         self.start = time.time()
         self.value = 0
         self.speed = 0
-
-
-class wait:
-    def __init__(self, tasks):
-        self._initial_tasks = tasks
-        self._queue = queue.Queue()
-        self._tasks = None
-
-    async def __aenter__(self):
-        await self._init()
-        return self
-
-    async def __aexit__(self, ty, val, tb):
-        await self.cancel_remaining()
-
-    async def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        next = await self.next_done()
-        if next is None:
-            raise StopAsyncIteration
-        return next
-
-    async def _init(self):
-        async def wait_runner(task):
-             try:
-                 result = await task.join()
-             except Exception:
-                 pass
-             await self._queue.put(task)
-
-        self._tasks = []
-        for task in self._initial_tasks:
-            await spawn(wait_runner(task))
-            self._tasks.append(task)
-
-    async def next_done(self):
-        if self._tasks is None:
-            await self._init()
-        if not self._tasks:
-            return None
-
-        task = await self._queue.get()
-        self._tasks.remove(task)
-        return task
-
-    async def cancel_remaining(self):
-        if self._tasks is None:
-            await self._init()
-
-        for task in self._tasks:
-            await task.cancel()
-
-        self._tasks = []
 
 
 def pack_addr(addr):
@@ -733,6 +678,8 @@ def main():
         kernel.run(multi_server(*args.server))
     except Exception as e:
         traceback.print_exc()
+        for k, v in kernel._selector.get_map().items():
+            print(k, v)
         for conn in connections:
             print('|', conn, file=sys.stderr)
     except KeyboardInterrupt:
