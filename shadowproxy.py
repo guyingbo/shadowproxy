@@ -187,6 +187,7 @@ class ServerBase:
     def on_disconnect_remote(self):
         global remote_num
         remote_num -= 1
+        return
         if getattr(self, 'via', None):
             if verbose > 0:
                 print(f'Disconnect {self} ({self.stats})')
@@ -670,8 +671,9 @@ async def show_stats():
         async with SignalSet(signal.SIGUSR1) as sig:
             signo = await sig.wait()
             for conn in connections:
-                print('|', conn)
-            print('-'*20, f'{total_stats} ( {total_stats.get_speed()} )', '-'*20)
+                print(f'| {conn} ({conn.stats})')
+            n = len(connections)
+            print('-'*15, f'{n} connections, {total_stats} ( {total_stats.get_speed()} )', '-'*15)
             total_stats.reset()
 
 
