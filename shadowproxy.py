@@ -23,10 +23,10 @@ This project is inspired by qwj's python-proxy project(https://github.com/qwj/py
 
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[{=remote_scheme}://[cipher:password@]{netloc}]
 support schemes:
-  local_scheme:   socks, ss, red, http, udpss(udp)
+  local_scheme:   socks, ss, red, http, ssudp(udp)
   remote_scheme:  ss
 
-example: python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888 ss://aes-256-cfb:password@:8888 udpss://aes-256-cfb:password@:8527
+example: python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888 ss://aes-256-cfb:password@:8888 ssudp://aes-256-cfb:password@:8527
 '''
 verbose = 0
 remote_num = 0
@@ -151,6 +151,7 @@ class ServerBase:
         self.laddr = addr
 
     async def __call__(self, client, addr):
+        self.stats = Stats()
         try:
             async with client:
                 self.setup(client.as_stream(), addr)
@@ -169,7 +170,6 @@ class ServerBase:
         raise NotImplemented
 
     async def connect_remote(self):
-        self.stats = Stats()
         global remote_num
         remote_num += 1
         if getattr(self, 'via', None):
@@ -201,9 +201,9 @@ class ServerBase:
             remote_stream = self.via_client.as_stream(remote_conn)
             try:
                 await remote_stream.client_init(self.taddr)
-            except Exception as e:
+            except Exception:
                 await remote_stream.close()
-                raise e
+                raise
         else:
             remote_stream = remote_conn.as_stream()
         return remote_stream
@@ -554,30 +554,53 @@ async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_a
         if reuse_address:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         async with sock:
-            while True:
-                data, addr = await sock.recvfrom(8192)
-                try:
-                    await handler_task(data, addr)
-                except Exception as e:
-                    if verbose > 0:
-                        print(e)
-                    if verbose > 1:
-                        traceback.print_exc()
+            await handler_task(sock)
     except Exception:
         sock._socket.close()
         raise
 
 
-class UDPSSServer:
+class RedirectUDPServer:
+    def __init__(self, via=None):
+        self.via = via
+
+    async def __call__(self, sock):
+        while True:
+            data, ancdata, msg_flags, addr = await sock.recvmsg(8192)
+            print(data, ancdata, msg_flags, addr)
+            continue
+            SO_ORIGINAL_DST = 80
+            try:
+                buf = client._socket.getsockopt(socket.SOL_IP, SO_ORIGINAL_DST, 16)
+                port, host = struct.unpack('!2xH4s8x', buf)
+                self.taddr = (socket.inet_ntoa(host), port)
+            except Exception as e:
+                if verbose > 0:
+                    print("It seems not been a proxy connection:", e, 'bye.')
+                await client.close()
+                return
+
+
+class SSUDPServer:
     def __init__(self, cipher_cls, password):
         self.cipher_cls = cipher_cls
         self.password = password
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     async def __call__(self, data, addr):
+        while True:
+            data, addr = await sock.recvfrom(8192)
+            try:
+                await handler_task(data, addr)
+            except Exception as e:
+                if verbose > 0:
+                    print(e)
+                if verbose > 1:
+                    traceback.print_exc()
+
         iv = data[:self.cipher_cls.IV_LENGTH]
         decrypter = self.cipher_cls(self.password, iv=iv)
-        payload = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
+        data = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
         host, port, payload = unpack_addr(data)
         taddr = (host, port)
         while payload:
@@ -591,7 +614,8 @@ protos = {
     'socks': SocksConnection,
     'red': RedirectConnection,
     'ssr': SSClient,
-    'udpss': UDPSSServer,
+    'ssudp': SSUDPServer,
+    'redudp': RedirectUDPServer,
 }
 def uri_compile(uri):
     url = urllib.parse.urlparse(uri)
@@ -625,10 +649,10 @@ def get_server(uri):
             listen.kw['via'] = via
         host = listen.kw.pop('host')
         port = listen.kw.pop('port')
-        if listen.scheme in ('ss', 'udpss') and 'cipher_cls' not in listen.kw:
+        if listen.scheme in ('ss', 'ssudp') and 'cipher_cls' not in listen.kw:
             raise argparse.ArgumentTypeError('you need to assign cryto algorithm and password: '
                                              f'{listen.scheme}://{host}:{port}')
-        if listen.scheme.startswith('udp'):
+        if listen.scheme.endswith('udp'):
             server = udp_server(host, port, listen.proto(**listen.kw))
         else:
             server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024)
