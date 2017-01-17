@@ -28,6 +28,13 @@ support schemes:
 
 example: python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888 ss://aes-256-cfb:password@:8888 ssudp://aes-256-cfb:password@:8527
 '''
+SO_ORIGINAL_DST = 80
+IP_TRANSPARENT = 19
+IP_ORIGDSTADDR = 20
+IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
+# SOL_IPV6 = 41
+# IPV6_ORIGDSTADDR = 74
+# IPV6_RECVORIGDSTADDR = IPV6_ORIGDSTADDR
 verbose = 0
 remote_num = 0
 print = partial(print, flush=True)
@@ -244,7 +251,6 @@ class RedirectConnection(ServerBase):
         self.via = via
 
     async def __call__(self, client, addr):
-        SO_ORIGINAL_DST = 80
         try:
             buf = client._socket.getsockopt(socket.SOL_IP, SO_ORIGINAL_DST, 16)
             port, host = struct.unpack('!2xH4s8x', buf)
@@ -565,11 +571,11 @@ class RedirectUDPServer:
         self.via = via
 
     async def __call__(self, sock):
+        sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, True)
         while True:
-            data, ancdata, msg_flags, addr = await sock.recvmsg(8192)
+            data, ancdata, msg_flags, addr = await sock.recvmsg(8192, socket.CMSG_SPACE(24))
             print(data, ancdata, msg_flags, addr)
             continue
-            SO_ORIGINAL_DST = 80
             try:
                 buf = client._socket.getsockopt(socket.SOL_IP, SO_ORIGINAL_DST, 16)
                 port, host = struct.unpack('!2xH4s8x', buf)
