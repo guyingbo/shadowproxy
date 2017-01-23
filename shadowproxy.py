@@ -566,25 +566,96 @@ async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_a
         raise
 
 
-class RedirectUDPServer:
+class SSUDPClient:
+    def __init__(self, cipher_cls, password, host, port):
+        self.cipher_cls = cipher_cls
+        self.password = password
+        self.raddr = (host, port)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    async def sendto(self, data, addr):
+        encrypter = self.cipher_cls(self.password)
+        payload = encrypter.iv + encrypter.encrypt(pack_addr(addr) + data)
+        while payload:
+            nbytes = await self.sock.sendto(payload, self.raddr)
+            payload = payload[nbytes:]
+
+    def decrypt(self, data):
+        iv = data[:self.cipher_cls.IV_LENGTH]
+        cipher = self.cipher_cls(self.password, iv)
+        data = cipher.decrypt(data[self.cipher_cls.IV_LENGTH:])
+        addr, payload = unpack_addr(data)
+        return payload, addr
+
+    async def relay(self, bind_sock, addr):
+        self.task = spawn(self._relay(bind_sock, addr))
+
+    async def _relay(self, bind_sock, addr):
+        try:
+            while True:
+                data, taddr = await self.sock.recvfrom(8192)
+                payload, _ = self.decrypt(data)
+                if verbose > 0:
+                    print(f'reply : {taddr} via {self.raddr} to   {addr} {_}')
+                await bind_sock.sendto(payload, addr)
+        except CancelledError:
+            print('quit')
+            pass
+
+    async def close(self):
+        await self.task.cancel()
+
+
+class TProxyUDPServer:
     def __init__(self, via=None):
         self.via = via
+        self.removed = None
+        def callback(key, value):
+            self.removed = (key, value)
+        import pylru
+        self.addr2client = pylru.lrucache(256, callback)
+
+    @staticmethod
+    def get_origin_dst(ancdata):
+        for cmsg_level, cmsg_type, cmsg_data in ancdata:
+            if cmsg_level == socket.SOL_IP and cmsg_type == IP_RECVORIGDSTADDR:
+                family, port, ip = struct.unpack('!HH4s8x', cmsg_data)
+                return (socket.inet_ntoa(ip), port)
 
     async def __call__(self, sock):
+        sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, True)
         sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, True)
         while True:
             data, ancdata, msg_flags, addr = await sock.recvmsg(8192, socket.CMSG_SPACE(24))
-            print(data, ancdata, msg_flags, addr)
-            continue
-            try:
-                buf = client._socket.getsockopt(socket.SOL_IP, SO_ORIGINAL_DST, 16)
-                port, host = struct.unpack('!2xH4s8x', buf)
-                self.taddr = (socket.inet_ntoa(host), port)
-            except Exception as e:
+            #info = await socket.getaddrinfo(*addr, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
+            #print(info)
+            #if addr[0] == vaddr[0]:
+            #    data, taddr = self.via.decrypt(data)
+            #    laddr = d[taddr]
+            #    if verbose > 0:
+            #        print(f'reply : {taddr} via {addr} to   {laddr}')
+            #    while data:
+            #        nbytes = await sock.sendto(data, laddr)
+            #        print(f'send {nbytes} bytes')
+            #        data = data[nbytes:]
+            #    continue
+            taddr = self.get_origin_dst(ancdata)
+            if taddr is None:
                 if verbose > 0:
-                    print("It seems not been a proxy connection:", e, 'bye.')
-                await client.close()
-                return
+                    print('can not recognize the original destination')
+                continue
+            if addr not in self.addr2client:
+                via_client = self.via()
+                self.addr2client[addr] = via_client
+                if self.removed is not None:
+                    await self.removed[1].close()
+                    self.removed = None
+            via_client = self.addr2client[addr]
+            vaddr = via_client.raddr
+            if verbose > 0:
+                print(f'send to {taddr} via {vaddr} from {addr}')
+            await via_client.sendto(data, taddr)
+            await via_client.relay(sock, addr)
 
 
 class SSUDPServer:
@@ -593,25 +664,18 @@ class SSUDPServer:
         self.password = password
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    async def __call__(self, data, addr):
+    async def __call__(self, sock):
         while True:
             data, addr = await sock.recvfrom(8192)
-            try:
-                await handler_task(data, addr)
-            except Exception as e:
-                if verbose > 0:
-                    print(e)
-                if verbose > 1:
-                    traceback.print_exc()
-
-        iv = data[:self.cipher_cls.IV_LENGTH]
-        decrypter = self.cipher_cls(self.password, iv=iv)
-        data = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
-        host, port, payload = unpack_addr(data)
-        taddr = (host, port)
-        while payload:
-            nbytes = await self.sock.sendto(payload, taddr)
-            payload = payload[nbytes:]
+            if len(data) > self.cipher_cls.IV_LENGTH:
+                continue
+            iv = data[:self.cipher_cls.IV_LENGTH]
+            decrypter = self.cipher_cls(self.password, iv=iv)
+            data = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
+            taddr, payload = unpack_addr(data)
+            while payload:
+                nbytes = await self.sock.sendto(payload, taddr)
+                payload = payload[nbytes:]
 
 
 protos = {
@@ -621,7 +685,8 @@ protos = {
     'red': RedirectConnection,
     'ssr': SSClient,
     'ssudp': SSUDPServer,
-    'redudp': RedirectUDPServer,
+    'tproxyudp': TProxyUDPServer,
+    'ssrudp': SSUDPClient,
 }
 def uri_compile(uri):
     url = urllib.parse.urlparse(uri)
@@ -726,7 +791,7 @@ def main():
         for conn in connections:
             print('|', conn, file=sys.stderr)
     except KeyboardInterrupt:
-        pass
+        kernel.run(shutdown=True)
 
 if __name__ == '__main__':
     main()
