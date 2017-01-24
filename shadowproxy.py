@@ -598,9 +598,7 @@ class SSUDPClient:
     async def sendto(self, data, addr):
         encrypter = self.cipher_cls(self.password)
         payload = encrypter.iv + encrypter.encrypt(pack_addr(addr) + data)
-        while payload:
-            nbytes = await self.sock.sendto(payload, self.raddr)
-            payload = payload[nbytes:]
+        await self.sock.sendto(payload, self.raddr)
 
     def _unpack(self, data):
         iv = data[:self.cipher_cls.IV_LENGTH]
@@ -725,9 +723,7 @@ class SSUDPServer:
             decrypter = self.cipher_cls(self.password, iv=iv)
             data = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
             taddr, payload = unpack_addr(data)
-            while payload:
-                nbytes = await self.sock.sendto(payload, taddr)
-                payload = payload[nbytes:]
+            await self.sock.sendto(payload, taddr)
 
 
 protos = {
