@@ -36,6 +36,7 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 # SOL_IPV6 = 41
 # IPV6_ORIGDSTADDR = 74
 # IPV6_RECVORIGDSTADDR = IPV6_ORIGDSTADDR
+args = None
 verbose = 0
 remote_num = 0
 print = partial(print, flush=True)
@@ -601,29 +602,32 @@ class SSUDPClient:
             nbytes = await self.sock.sendto(payload, self.raddr)
             payload = payload[nbytes:]
 
-    def decrypt(self, data):
+    def _unpack(self, data):
         iv = data[:self.cipher_cls.IV_LENGTH]
         cipher = self.cipher_cls(self.password, iv)
         data = cipher.decrypt(data[self.cipher_cls.IV_LENGTH:])
         addr, payload = unpack_addr(data)
         return payload, addr
 
-    async def relay(self, addr):
+    async def relay(self, addr, sender=None):
         if self._relay_task is None:
-            self._relay_task = await spawn(self._relay(addr))
+            self._relay_task = await spawn(self._relay(addr, sender))
 
-    async def _relay(self, addr):
+    async def _relay(self, addr, sender):
         try:
             while True:
                 data, _ = await self.sock.recvfrom(8192)
-                payload, taddr = self.decrypt(data)
+                payload, taddr = self._unpack(data)
                 if verbose > 0:
                     print(f'reply : {taddr[0]}:{taddr[1]} via {self.raddr[0]}:{self.raddr[1]} to   {addr[0]}:{addr[1]}')
-                sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
-                sender.bind(taddr)
-                async with sender:
+                if sender is None:
+                    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+                    sender.bind(taddr)
+                    async with sender:
+                        await sender.sendto(payload, addr)
+                else:
                     await sender.sendto(payload, addr)
         except CancelledError:
             pass
@@ -678,6 +682,34 @@ class TProxyUDPServer:
             await via_client.relay(addr)
 
 
+class TunnelUDPServer:
+    def __init__(self, via=None):
+        self.via = via
+        self.removed = None
+        def callback(key, value):
+            self.removed = (key, value)
+        import pylru
+        self.addr2client = pylru.lrucache(256, callback)
+
+    async def __call__(self, sock):
+        taddr = args.dst
+        via_client = self.via()
+        while True:
+            data, addr = await sock.recvfrom(8192)
+            if addr not in self.addr2client:
+                via_client = self.via()
+                self.addr2client[addr] = via_client
+                if self.removed is not None:
+                    await self.removed[1].close()
+                    self.removed = None
+                via_client = self.addr2client[addr]
+                vaddr = via_client.raddr
+                if verbose > 0:
+                    print(f'send to {taddr[0]}:{taddr[1]} via {vaddr[0]}:{vaddr[1]} from {addr[0]}:{addr[1]}')
+                await via_client.sendto(data, taddr)
+                await via_client.relay(addr, sock)
+
+
 class SSUDPServer:
     def __init__(self, cipher_cls, password):
         self.cipher_cls = cipher_cls
@@ -706,6 +738,7 @@ protos = {
     'ssr': SSClient,
     'ssudp': SSUDPServer,
     'tproxyudp': TProxyUDPServer,
+    'tunneludp': TunnelUDPServer,
     'ssrudp': SSUDPClient,
 }
 def uri_compile(uri):
@@ -792,15 +825,28 @@ async def show_stats():
             total_stats.reset()
 
 
+def get_addr(s):
+    host, _, port = s.partition(':')
+    return (host, int(port))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__description__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument('--monitor', dest='monitor', action='store_true')
+    parser.add_argument('--dst', dest='dst', type=get_addr, help='destination address(use for tunnnel udp')
     parser.add_argument('server', nargs='+', type=get_server)
+    global args, verbose
     args = parser.parse_args()
-    global verbose
     verbose = args.verbose
+    for server_list in args.server:
+        for server, addr, scheme in server_list:
+            if scheme=='tunneludp' and args.dst is None:
+                print('dst must be assign in tunnel udp mode', file=sys.stderr)
+                import warnings
+                warnings.simplefilter('ignore')
+                return
     kernel = curio.Kernel(with_monitor=args.monitor)
     try:
         kernel.run(multi_server(*args.server))
