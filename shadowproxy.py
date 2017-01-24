@@ -9,6 +9,7 @@ import urllib.parse
 import ipaddress
 import traceback
 import argparse
+import warnings
 import weakref
 import signal
 import struct
@@ -587,6 +588,41 @@ async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_a
         raise
 
 
+class UDPClient:
+    def __init__(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._relay_task = None
+
+    async def sendto(self, data, addr):
+        await self.sock.sendto(data, addr)
+
+    async def relay(self, addr, listen_addr, sendfunc=None):
+        if self._relay_task is None:
+            self._relay_task = await spawn(self._relay(addr, listen_addr, sendfunc))
+
+    async def _relay(self, addr, listen_addr, sendfunc):
+        try:
+            while True:
+                data, raddr = await self.sock.recvfrom(8192)
+                if verbose > 0:
+                    print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {raddr[0]}:{raddr[1]}')
+                if sendfunc is None:
+                    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+                    sender.bind(raddr)
+                    async with sender:
+                        await sender.sendto(data, addr)
+                else:
+                    await sendfunc(data, addr)
+        except CancelledError:
+            pass
+
+    async def close(self):
+        await self._relay_task.cancel()
+        await self.sock.close()
+
+
 class SSUDPClient:
     def __init__(self, cipher_cls, password, host, port):
         self.cipher_cls = cipher_cls
@@ -596,6 +632,7 @@ class SSUDPClient:
         self._relay_task = None
 
     async def sendto(self, data, addr):
+        self.taddr = addr
         encrypter = self.cipher_cls(self.password)
         payload = encrypter.iv + encrypter.encrypt(pack_addr(addr) + data)
         await self.sock.sendto(payload, self.raddr)
@@ -607,18 +644,18 @@ class SSUDPClient:
         addr, payload = unpack_addr(data)
         return payload, addr
 
-    async def relay(self, addr, sender=None):
+    async def relay(self, addr, listen_addr, sendfunc=None):
         if self._relay_task is None:
-            self._relay_task = await spawn(self._relay(addr, sender))
+            self._relay_task = await spawn(self._relay(addr, listen_addr, sendfunc))
 
-    async def _relay(self, addr, sender):
+    async def _relay(self, addr, listen_addr, sendfunc):
         try:
             while True:
                 data, _ = await self.sock.recvfrom(8192)
                 payload, taddr = self._unpack(data)
                 if verbose > 0:
-                    print(f'reply : {taddr[0]}:{taddr[1]} via {self.raddr[0]}:{self.raddr[1]} to   {addr[0]}:{addr[1]}')
-                if sender is None:
+                    print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {self.raddr[0]}:{self.raddr[1]} <-- {self.taddr[0]}:{self.taddr[1]}')
+                if sendfunc is None:
                     sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
@@ -626,7 +663,7 @@ class SSUDPClient:
                     async with sender:
                         await sender.sendto(payload, addr)
                 else:
-                    await sender.sendto(payload, addr)
+                    await sendfunc(payload, addr)
         except CancelledError:
             pass
 
@@ -654,6 +691,7 @@ class TProxyUDPServer:
     async def __call__(self, sock):
         sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, True)
         sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+        listen_addr = sock.getsockname()
         while True:
             data, ancdata, msg_flags, addr = await sock.recvmsg(8192, socket.CMSG_SPACE(24))
             #info = await socket.getaddrinfo(*addr, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
@@ -675,9 +713,9 @@ class TProxyUDPServer:
             via_client = self.addr2client[addr]
             vaddr = via_client.raddr
             if verbose > 0:
-                print(f'send to {taddr[0]}:{taddr[1]} via {vaddr[0]}:{vaddr[1]} from {addr[0]}:{addr[1]}')
+                print(f'udp: {addr[0]}:{addr[1]} --> {listen_addr[0]}:{listen_addr[1]} --> {vaddr[0]}:{vaddr[1]} --> {taddr[0]}:{taddr[1]}')
             await via_client.sendto(data, taddr)
-            await via_client.relay(addr)
+            await via_client.relay(addr, listen_addr)
 
 
 class TunnelUDPServer:
@@ -691,7 +729,7 @@ class TunnelUDPServer:
 
     async def __call__(self, sock):
         taddr = args.dst
-        via_client = self.via()
+        listen_addr = sock.getsockname()
         while True:
             data, addr = await sock.recvfrom(8192)
             if addr not in self.addr2client:
@@ -700,30 +738,52 @@ class TunnelUDPServer:
                 if self.removed is not None:
                     await self.removed[1].close()
                     self.removed = None
-                via_client = self.addr2client[addr]
-                vaddr = via_client.raddr
-                if verbose > 0:
-                    print(f'send to {taddr[0]}:{taddr[1]} via {vaddr[0]}:{vaddr[1]} from {addr[0]}:{addr[1]}')
-                await via_client.sendto(data, taddr)
-                await via_client.relay(addr, sock)
+            via_client = self.addr2client[addr]
+            vaddr = via_client.raddr
+            if verbose > 0:
+                print(f'udp: {addr[0]}:{addr[1]} --> {listen_addr[0]}:{listen_addr[1]} --> {vaddr[0]}:{vaddr[1]} --> {taddr[0]}:{taddr[1]}')
+            await via_client.sendto(data, taddr)
+            await via_client.relay(addr, listen_addr, sock.sendto)
 
 
 class SSUDPServer:
     def __init__(self, cipher_cls, password):
+        self.via = UDPClient
         self.cipher_cls = cipher_cls
         self.password = password
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.removed = None
+        def callback(key, value):
+            self.removed = (key, value)
+        import pylru
+        self.addr2client = pylru.lrucache(256, callback)
 
     async def __call__(self, sock):
+        listen_addr = sock.getsockname()
         while True:
             data, addr = await sock.recvfrom(8192)
-            if len(data) > self.cipher_cls.IV_LENGTH:
+            if len(data) <= self.cipher_cls.IV_LENGTH:
                 continue
+            if addr not in self.addr2client:
+                via_client = self.via()
+                self.addr2client[addr] = via_client
+                if self.removed is not None:
+                    await self.removed[1].close()
+                    self.removed = None
+            via_client = self.addr2client[addr]
             iv = data[:self.cipher_cls.IV_LENGTH]
             decrypter = self.cipher_cls(self.password, iv=iv)
             data = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
             taddr, payload = unpack_addr(data)
-            await self.sock.sendto(payload, taddr)
+            if verbose > 0:
+                print(f'udp: {addr[0]}:{addr[1]} --> {listen_addr[0]}:{listen_addr[1]} --> {taddr[0]}:{taddr[1]}')
+            await via_client.sendto(payload, taddr)
+
+            async def sendto(data, taddr):
+                encrypter = self.cipher_cls(self.password)
+                payload = encrypter.encrypt(pack_addr(taddr)+data)
+                await sock.sendto(encrypter.iv+payload, addr)
+
+            await via_client.relay(addr, listen_addr, sendto)
 
 
 protos = {
@@ -840,7 +900,6 @@ def main():
         for server, addr, scheme in server_list:
             if scheme=='tunneludp' and args.dst is None:
                 print('dst must be assign in tunnel udp mode', file=sys.stderr)
-                import warnings
                 warnings.simplefilter('ignore')
                 return
     kernel = curio.Kernel(with_monitor=args.monitor)
