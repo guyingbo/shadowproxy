@@ -162,10 +162,10 @@ class ServerBase:
             target_host, target_port = self.taddr
         else:
             target_host, target_port = 'unknown', -1
-        s = f'{target_host}:{target_port} ' \
-            f'from {self.__proto__}:{self.laddr[0]}:{self.laddr[1]}'
+        s = f'{self.laddr[0]}:{self.laddr[1]},{self.__proto__}'
         if getattr(self, 'via_client', None):
-            s += f' via {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
+            s += f' --> {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
+        s += f' --> {target_host}:{target_port}'
         return s
 
     @property
@@ -204,12 +204,12 @@ class ServerBase:
         if getattr(self, 'via', None):
             self.via_client = self.via()
             if verbose > 0:
-                print(f'Connecting {self}')
+                print(f'tcp: {self}')
             remote_conn = await self.via_client.connect()
         else:
             self.via_client = None
             if verbose > 0:
-                print(f'Connecting {self}')
+                print(f'tcp: {self}')
             remote_conn = await curio.open_connection(*self.taddr)
         return remote_conn
 
