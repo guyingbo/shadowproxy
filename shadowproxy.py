@@ -6,6 +6,7 @@ from curio.signal import SignalSet
 from functools import partial
 import time
 import urllib.parse
+import ipaddress
 import traceback
 import argparse
 import weakref
@@ -38,6 +39,25 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 verbose = 0
 remote_num = 0
 print = partial(print, flush=True)
+local_networks = [
+    '0.0.0.0/8',
+    '10.0.0.0/8',
+    '127.0.0.0/8',
+    '169.254.0.0/16',
+    '172.16.0.0/12',
+    '192.168.0.0/16',
+    '224.0.0.0/4',
+    '240.0.0.0/4',
+]
+local_networks = [ipaddress.ip_network(s) for s in local_networks]
+
+
+def is_local(host):
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return any(address in nw for nw in local_networks)
 
 
 class Stats:
@@ -572,6 +592,7 @@ class SSUDPClient:
         self.password = password
         self.raddr = (host, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._relay_task = None
 
     async def sendto(self, data, addr):
         encrypter = self.cipher_cls(self.password)
@@ -587,23 +608,29 @@ class SSUDPClient:
         addr, payload = unpack_addr(data)
         return payload, addr
 
-    async def relay(self, bind_sock, addr):
-        self.task = spawn(self._relay(bind_sock, addr))
+    async def relay(self, addr):
+        if self._relay_task is None:
+            self._relay_task = await spawn(self._relay(addr))
 
-    async def _relay(self, bind_sock, addr):
+    async def _relay(self, addr):
         try:
             while True:
-                data, taddr = await self.sock.recvfrom(8192)
-                payload, _ = self.decrypt(data)
+                data, _ = await self.sock.recvfrom(8192)
+                payload, taddr = self.decrypt(data)
                 if verbose > 0:
-                    print(f'reply : {taddr} via {self.raddr} to   {addr} {_}')
-                await bind_sock.sendto(payload, addr)
+                    print(f'reply : {taddr[0]}:{taddr[1]} via {self.raddr[0]}:{self.raddr[1]} to   {addr[0]}:{addr[1]}')
+                sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+                sender.bind(taddr)
+                async with sender:
+                    await sender.sendto(payload, addr)
         except CancelledError:
-            print('quit')
             pass
 
     async def close(self):
-        await self.task.cancel()
+        await self._relay_task.cancel()
+        await self.sock.close()
 
 
 class TProxyUDPServer:
@@ -623,26 +650,19 @@ class TProxyUDPServer:
                 return (socket.inet_ntoa(ip), port)
 
     async def __call__(self, sock):
-        sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, True)
         sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, True)
+        sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
         while True:
             data, ancdata, msg_flags, addr = await sock.recvmsg(8192, socket.CMSG_SPACE(24))
             #info = await socket.getaddrinfo(*addr, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
-            #print(info)
-            #if addr[0] == vaddr[0]:
-            #    data, taddr = self.via.decrypt(data)
-            #    laddr = d[taddr]
-            #    if verbose > 0:
-            #        print(f'reply : {taddr} via {addr} to   {laddr}')
-            #    while data:
-            #        nbytes = await sock.sendto(data, laddr)
-            #        print(f'send {nbytes} bytes')
-            #        data = data[nbytes:]
-            #    continue
             taddr = self.get_origin_dst(ancdata)
             if taddr is None:
                 if verbose > 0:
                     print('can not recognize the original destination')
+                continue
+            elif is_local(taddr[0]):
+                if verbose > 0:
+                    print(f'local addresses are forbidden: {taddr[0]}')
                 continue
             if addr not in self.addr2client:
                 via_client = self.via()
@@ -653,9 +673,9 @@ class TProxyUDPServer:
             via_client = self.addr2client[addr]
             vaddr = via_client.raddr
             if verbose > 0:
-                print(f'send to {taddr} via {vaddr} from {addr}')
+                print(f'send to {taddr[0]}:{taddr[1]} via {vaddr[0]}:{vaddr[1]} from {addr[0]}:{addr[1]}')
             await via_client.sendto(data, taddr)
-            await via_client.relay(sock, addr)
+            await via_client.relay(addr)
 
 
 class SSUDPServer:
@@ -792,6 +812,7 @@ def main():
             print('|', conn, file=sys.stderr)
     except KeyboardInterrupt:
         kernel.run(shutdown=True)
+        print()
 
 if __name__ == '__main__':
     main()
