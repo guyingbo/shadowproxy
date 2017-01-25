@@ -615,12 +615,16 @@ class UDPClient:
                 if verbose > 0:
                     print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {raddr[0]}:{raddr[1]}')
                 if sendfunc is None:
-                    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
-                    sender.bind(raddr)
-                    async with sender:
-                        await sender.sendto(data, addr)
+                    try:
+                        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                        sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+                        sender.bind(raddr)
+                        async with sender:
+                            await sender.sendto(data, addr)
+                    except OSError as e:
+                        if verbose > 0:
+                            print(e, raddr)
                 else:
                     await sendfunc(data, addr)
         except CancelledError:
@@ -664,12 +668,16 @@ class SSUDPClient:
                 if verbose > 0:
                     print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {self.raddr[0]}:{self.raddr[1]} <-- {self.taddr[0]}:{self.taddr[1]}')
                 if sendfunc is None:
-                    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
-                    sender.bind(taddr)
-                    async with sender:
-                        await sender.sendto(payload, addr)
+                    try:
+                        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sender.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                        sender.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+                        sender.bind(taddr)
+                        async with sender:
+                            await sender.sendto(payload, addr)
+                    except OSError as e:
+                        if verbose > 0:
+                            print(e, raddr)
                 else:
                     await sendfunc(payload, addr)
         except CancelledError:
