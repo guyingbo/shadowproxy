@@ -677,7 +677,7 @@ class SSUDPClient:
                             await sender.sendto(payload, addr)
                     except OSError as e:
                         if verbose > 0:
-                            print(e, raddr)
+                            print(e, taddr)
                 else:
                     await sendfunc(payload, addr)
         except CancelledError:
