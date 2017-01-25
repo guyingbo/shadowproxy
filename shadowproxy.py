@@ -598,7 +598,7 @@ async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_a
 
 def Sendto():
     socks = weakref.WeakValueDictionary()
-    def sendto_from(bind_addr, data, addr):
+    async def sendto_from(bind_addr, data, addr):
         try:
             if bind_addr not in socks:
                 sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -635,7 +635,7 @@ class UDPClient:
                 if verbose > 0:
                     print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {raddr[0]}:{raddr[1]}')
                 if sendfunc is None:
-                    sendto_from(raddr, data, addr)
+                    await sendto_from(raddr, data, addr)
                 else:
                     await sendfunc(data, addr)
         except CancelledError:
@@ -679,7 +679,7 @@ class SSUDPClient:
                 if verbose > 0:
                     print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {self.raddr[0]}:{self.raddr[1]} <-- {self.taddr[0]}:{self.taddr[1]}')
                 if sendfunc is None:
-                    sendto_from(taddr, payload, addr)
+                    await sendto_from(taddr, payload, addr)
                 else:
                     await sendfunc(payload, addr)
         except CancelledError:
