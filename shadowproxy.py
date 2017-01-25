@@ -9,7 +9,6 @@ import urllib.parse
 import ipaddress
 import traceback
 import argparse
-import warnings
 import weakref
 import signal
 import struct
@@ -24,11 +23,21 @@ Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
 This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
 
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[{=remote_scheme}://[cipher:password@]{netloc}]
-support schemes:
-  local_scheme:   socks, ss, red, http, ssudp(udp)
-  remote_scheme:  ss
+support tcp schemes:
+  local_scheme:   socks, ss, red, http
+  remote_scheme:  ssr
+support udp schemes:
+  local_scheme:   ssudp, tproxyudp, tunneludp
+  remote_scheme:  ssrudp
 
-example: python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888 ss://aes-256-cfb:password@:8888 ssudp://aes-256-cfb:password@:8527
+examples:
+  python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888                     # socks5 --> shadowsocks
+  python3.6 %(prog)s -v http://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888                      # http   --> shadowsocks
+  python3.6 %(prog)s -v red://:12345=ssr://aes-256-cfb:password@127.0.0.1:8888                      # redir  --> shadowsocks
+  python3.6 %(prog)s -v ss://aes-256-cfb:password@:8888                                             # shadowsocks server (tcp)
+  python3.6 %(prog)s -v ssudp://aes-256-cfb:password@:8527                                          # shadowsocks server (udp)
+  python3.6 %(prog)s -v tunneludp://:8527#8.8.8.8:53=ssrudp://aes-256-cfb:password@127.0.0.1:8888   # tunnel --> shadowsocks (udp)
+  sudo python3.6 %(prog)s -v tproxyudp://:8527=ssrudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
 '''
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
@@ -37,7 +46,6 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 # SOL_IPV6 = 41
 # IPV6_ORIGDSTADDR = 74
 # IPV6_RECVORIGDSTADDR = IPV6_ORIGDSTADDR
-args = None
 verbose = 0
 remote_num = 0
 print = partial(print, flush=True)
@@ -719,7 +727,8 @@ class TProxyUDPServer:
 
 
 class TunnelUDPServer:
-    def __init__(self, via=None):
+    def __init__(self, target_addr, via=None):
+        self.taddr = target_addr
         self.via = via
         self.removed = None
         def callback(key, value):
@@ -728,7 +737,7 @@ class TunnelUDPServer:
         self.addr2client = pylru.lrucache(256, callback)
 
     async def __call__(self, sock):
-        taddr = args.dst
+        taddr = self.taddr
         listen_addr = sock.getsockname()
         while True:
             data, addr = await sock.recvfrom(8192)
@@ -799,9 +808,14 @@ protos = {
 }
 def uri_compile(uri):
     url = urllib.parse.urlparse(uri)
+    kw = {}
+    if url.scheme == 'tunneludp':
+        if not url.fragment:
+            raise argparse.ArgumentTypeError('destitation must be assign in tunnel udp mode, example tunneludp://:53#8.8.8.8:53')
+        host, _, port = url.fragment.partition(':')
+        kw['target_addr'] = (host, int(port))
     proto = protos[url.scheme]
     cipher, _, loc = url.netloc.rpartition('@')
-    kw = {}
     if cipher:
         cipher_cls, _, password = cipher.partition(':')
         kw['cipher_cls'] = AES256CFBCipher
@@ -881,27 +895,15 @@ async def show_stats():
             total_stats.reset()
 
 
-def get_addr(s):
-    host, _, port = s.partition(':')
-    return (host, int(port))
-
-
 def main():
     parser = argparse.ArgumentParser(description=__description__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument('--monitor', dest='monitor', action='store_true')
-    parser.add_argument('--dst', dest='dst', type=get_addr, help='destination address(use for tunnnel udp')
     parser.add_argument('server', nargs='+', type=get_server)
-    global args, verbose
     args = parser.parse_args()
+    global verbose
     verbose = args.verbose
-    for server_list in args.server:
-        for server, addr, scheme in server_list:
-            if scheme=='tunneludp' and args.dst is None:
-                print('dst must be assign in tunnel udp mode', file=sys.stderr)
-                warnings.simplefilter('ignore')
-                return
     kernel = curio.Kernel(with_monitor=args.monitor)
     try:
         kernel.run(multi_server(*args.server))
