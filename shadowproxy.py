@@ -679,7 +679,7 @@ class SSUDPClient:
                 if verbose > 0:
                     print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {self.raddr[0]}:{self.raddr[1]} <-- {self.taddr[0]}:{self.taddr[1]}')
                 if sendfunc is None:
-                    await sendto_from(taddr, payload, addr)
+                    await sendto_from(self.taddr, payload, addr)
                 else:
                     await sendfunc(payload, addr)
         except CancelledError:
