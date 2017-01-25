@@ -170,7 +170,7 @@ class ServerBase:
             target_host, target_port = self.taddr
         else:
             target_host, target_port = 'unknown', -1
-        s = f'{self.laddr[0]}:{self.laddr[1]},{self.__proto__}'
+        s = f'{self.laddr[0]}:{self.laddr[1]} --> {self.__proto__}'
         if getattr(self, 'via_client', None):
             s += f' --> {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
         s += f' --> {target_host}:{target_port}'
