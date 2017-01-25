@@ -611,7 +611,7 @@ def Sendto():
                 await sender.sendto(data, addr)
         except OSError as e:
             if verbose > 0:
-                print(e, raddr)
+                print(e, bind_addr)
     return sendto_from
 sendto_from = Sendto()
 
