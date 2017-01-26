@@ -1,10 +1,8 @@
-'''Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.
-Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
-This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
+'''Universal proxy server/client which support Socks5/HTTP/Shadowsocks/Redirect (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
 
-uri syntax: {local_scheme}://[cipher:password@]{netloc}[{=remote_scheme}://[cipher:password@]{netloc}]
+uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_scheme}://[cipher:password@]{netloc}]
 support tcp schemes:
-  local_scheme:   socks, ss, red, http
+  local_scheme:   socks, ss, red, http, https
   remote_scheme:  ssr
 support udp schemes:
   local_scheme:   ssudp, tproxyudp, tunneludp

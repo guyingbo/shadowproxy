@@ -2,11 +2,26 @@
 
 ## Intro
 
-Proxy server that implements tcp: Socks5/HTTP/Shadowsocks/Redirect udp: TProxy/Tunnel protocols.
+Proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
+
+Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
+This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
+
 
 It is a replacement of shadowsocks and shadowsocks-libev, one can replace ss-redir, ss-tunnel, ss-server, ss-local with shadowproxy.py
 
 ## Usage
+
+```
+usage: shadowproxy.py [-h] [-v] [--version] [--monitor] server [server ...]
+uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_scheme}://[cipher:password@]{netloc}]
+support tcp schemes:
+  local_scheme:   socks, ss, red, http, https
+  remote_scheme:  ssr
+support udp schemes:
+  local_scheme:   ssudp, tproxyudp, tunneludp
+  remote_scheme:  ssrudp
+```
 
 examples:
 
