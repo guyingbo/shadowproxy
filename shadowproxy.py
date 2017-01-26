@@ -22,7 +22,7 @@ examples:
 from Crypto import Random
 from Crypto.Cipher import AES
 from hashlib import md5
-from curio import spawn, tcp_server, socket, CancelledError, wait
+from curio import spawn, tcp_server, socket, CancelledError, wait, ssl
 from curio.signal import SignalSet
 from functools import partial
 import time
@@ -643,13 +643,12 @@ class UDPClient:
         await self.sock.close()
 
 
-class SSUDPClient:
+class SSUDPClient(UDPClient):
     def __init__(self, cipher_cls, password, host, port):
         self.cipher_cls = cipher_cls
         self.password = password
         self.raddr = (host, port)
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._relay_task = None
+        super().__init__()
 
     async def sendto(self, data, addr):
         self.taddr = addr
@@ -664,10 +663,6 @@ class SSUDPClient:
         addr, payload = unpack_addr(data)
         return payload, addr
 
-    async def relay(self, addr, listen_addr, sendfunc=None):
-        if self._relay_task is None:
-            self._relay_task = await spawn(self._relay(addr, listen_addr, sendfunc))
-
     async def _relay(self, addr, listen_addr, sendfunc):
         try:
             while True:
@@ -681,10 +676,6 @@ class SSUDPClient:
                     await sendfunc(payload, addr)
         except CancelledError:
             pass
-
-    async def close(self):
-        await self._relay_task.cancel()
-        await self.sock.close()
 
 
 class TProxyUDPServer:
@@ -805,6 +796,7 @@ class SSUDPServer:
 protos = {
     'ss': SSConnection,
     'http': HTTPConnection,
+    'https': HTTPConnection,
     'socks': SocksConnection,
     'red': RedirectConnection,
     'ssr': SSClient,
@@ -821,6 +813,13 @@ def uri_compile(uri):
             raise argparse.ArgumentTypeError('destitation must be assign in tunnel udp mode, example tunneludp://:53#8.8.8.8:53')
         host, _, port = url.fragment.partition(':')
         kw['target_addr'] = (host, int(port))
+    if url.scheme in ('https',):
+        if not url.fragment:
+            raise argparse.ArgumentTypeError('#keyfile,certfile is needed')
+        keyfile, _, certfile = url.fragment.partition(',')
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
+        kw['ssl_context'] = ssl_context
     proto = protos[url.scheme]
     cipher, _, loc = url.netloc.rpartition('@')
     if cipher:
@@ -850,13 +849,14 @@ def get_server(uri):
             listen.kw['via'] = via
         host = listen.kw.pop('host')
         port = listen.kw.pop('port')
+        ssl_context = listen.kw.pop('ssl_context', None)
         if listen.scheme in ('ss', 'ssudp') and 'cipher_cls' not in listen.kw:
             raise argparse.ArgumentTypeError('you need to assign cryto algorithm and password: '
                                              f'{listen.scheme}://{host}:{port}')
         if listen.scheme.endswith('udp'):
             server = udp_server(host, port, listen.proto(**listen.kw))
         else:
-            server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024)
+            server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024, ssl=ssl_context)
         server_list.append((server, (host, port), listen.scheme))
     return server_list
 
