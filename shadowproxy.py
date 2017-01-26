@@ -1,24 +1,4 @@
-from Crypto import Random
-from Crypto.Cipher import AES
-from hashlib import md5
-from curio import spawn, tcp_server, socket, CancelledError, wait
-from curio.signal import SignalSet
-from functools import partial
-import time
-import urllib.parse
-import ipaddress
-import traceback
-import argparse
-import weakref
-import signal
-import struct
-import types
-import curio
-import sys
-import re
-import os
-__version__ = '0.1.0'
-__description__ = '''Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.
+'''Universal proxy server/client which support Socks/SS/Redirect/HTTP protocols.
 Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
 This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
 
@@ -39,6 +19,26 @@ examples:
   python3.6 %(prog)s -v tunneludp://:8527#8.8.8.8:53=ssrudp://aes-256-cfb:password@127.0.0.1:8888   # tunnel --> shadowsocks (udp)
   sudo python3.6 %(prog)s -v tproxyudp://:8527=ssrudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
 '''
+from Crypto import Random
+from Crypto.Cipher import AES
+from hashlib import md5
+from curio import spawn, tcp_server, socket, CancelledError, wait
+from curio.signal import SignalSet
+from functools import partial
+import time
+import urllib.parse
+import ipaddress
+import traceback
+import argparse
+import weakref
+import signal
+import struct
+import types
+import curio
+import sys
+import re
+import os
+__version__ = '0.1.0'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -166,13 +166,13 @@ class AES256CFBCipher(BaseCipher):
 
 class ServerBase:
     def __repr__(self):
+        s = f'{self.laddr[0]}:{self.laddr[1]} --> {self.__proto__}'
+        if getattr(self, 'via_client', None):
+            s += f' --> {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
         if hasattr(self, 'taddr'):
             target_host, target_port = self.taddr
         else:
             target_host, target_port = 'unknown', -1
-        s = f'{self.laddr[0]}:{self.laddr[1]} --> {self.__proto__}'
-        if getattr(self, 'via_client', None):
-            s += f' --> {self.via_client.raddr[0]}:{self.via_client.raddr[1]}'
         s += f' --> {target_host}:{target_port}'
         return s
 
@@ -196,10 +196,7 @@ class ServerBase:
                     await self.interact()
         except Exception as e:
             if verbose > 0:
-                if hasattr(self, 'taddr'):
-                    print(f'{self.taddr[0]}:{self.taddr[1]}', e)
-                else:
-                    print(e)
+                print(f'{self} error: {e}')
             if verbose > 1:
                 traceback.print_exc()
 
@@ -268,7 +265,7 @@ class ServerBase:
             pass
         except Exception as e:
             if verbose > 0:
-                print(f'{self.taddr[0]}:{self.taddr[1]} error:', e)
+                print(f'{self} error: {e}')
             if verbose > 1:
                 traceback.print_exc()
 
@@ -287,7 +284,7 @@ class RedirectConnection(ServerBase):
             self.taddr = (socket.inet_ntoa(host), port)
         except Exception as e:
             if verbose > 0:
-                print("It seems not been a proxy connection:", e, 'bye.')
+                print(f'{self} error: {e}\nIt seems not been a proxy connection')
             await client.close()
             return
         return (await super().__call__(client, addr))
@@ -483,7 +480,7 @@ class SocksConnection(ServerBase):
                 return
             except Exception as e:
                 if verbose > 0:
-                    print(e)
+                    print(f'{self} error: {e}')
                 if verbose > 1:
                     traceback.print_exc()
 
@@ -578,7 +575,7 @@ class HTTPConnection(ServerBase):
             pass
         except Exception as e:
             if verbose > 0:
-                print(f'{self.taddr[0]}:{self.taddr[1]} error:', e)
+                print(f'{self} error: {e}')
             if verbose > 1:
                 traceback.print_exc()
 
@@ -906,7 +903,7 @@ async def show_stats():
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__description__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument('--monitor', dest='monitor', action='store_true')
