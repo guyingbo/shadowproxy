@@ -14,17 +14,10 @@ with open(os.path.join(BASE_PATH, 'shadowproxy.py')) as f:
     except IndexError:
         raise RuntimeError('Unable to determine version.')
 
+with open(os.path.join(BASE_PATH, 'requirements.txt')) as f:
+    install_requires = [line for line in f.readlines() if line.strip()]
 
-long_description="""
-A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
-
-Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
-
-This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
-
-It is a replacement of shadowsocks and shadowsocks-libev, you can replace ss-redir, ss-tunnel, ss-server, ss-local with shadowproxy.py
-"""
-
+long_description=open('README.md').read()
 
 setup(
     name='shadowproxy',
@@ -38,6 +31,7 @@ setup(
     maintainer_email='tensiongyb@gmail.com',
     url='https://github.com/guyingbo/shadowproxy',
     py_modules = ['shadowproxy'],
+    install_requires=install_requires,
     entry_points={
         'console_scripts': [
             'shadowproxy = shadowproxy:main',
