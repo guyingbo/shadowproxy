@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.6
 '''Universal proxy server/client which support Socks5/HTTP/Shadowsocks/Redirect (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
 
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_scheme}://[cipher:password@]{netloc}]
@@ -909,6 +910,10 @@ def main():
     args = parser.parse_args()
     global verbose
     verbose = args.verbose
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (50000, 50000))
+    except Exception as e:
+        print('Require root permission to allocate resources')
     kernel = curio.Kernel(with_monitor=args.monitor)
     try:
         kernel.run(multi_server(*args.server))

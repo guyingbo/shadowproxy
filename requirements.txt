@@ -1,0 +1,2 @@
+pycryptodome==3.4.3
+curio==0.6.0
