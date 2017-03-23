@@ -21,7 +21,7 @@ setup(
     description='A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.',
     long_description=long_description,
     license='MIT',
-    version='0.1',
+    version=version,
     author='Yingbo Gu',
     author_email='tensiongyb@gmail.com',
     maintainer='Yingbo Gu',
