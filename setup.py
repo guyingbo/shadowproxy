@@ -14,9 +14,6 @@ with open(os.path.join(BASE_PATH, 'shadowproxy.py')) as f:
     except IndexError:
         raise RuntimeError('Unable to determine version.')
 
-with open(os.path.join(BASE_PATH, 'requirements.txt')) as f:
-    install_requires = [line for line in f.readlines() if line.strip()]
-
 long_description=open('README.md').read()
 
 setup(
@@ -31,7 +28,11 @@ setup(
     maintainer_email='tensiongyb@gmail.com',
     url='https://github.com/guyingbo/shadowproxy',
     py_modules = ['shadowproxy'],
-    install_requires=install_requires,
+    install_requires=[
+        'pycryptodome>=3.4.3',
+        'curio>=0.6.0',
+        'pylru>=1.0.9',
+    ],
     entry_points={
         'console_scripts': [
             'shadowproxy = shadowproxy:main',
