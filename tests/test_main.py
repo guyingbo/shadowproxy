@@ -15,3 +15,11 @@ def test_pack_addr():
 def test_unpack_addr():
     addr = ('232.32.9.86', 49238)
     assert shadowproxy.unpack_addr(shadowproxy.pack_addr(addr))[0] == addr
+
+
+def test_uri_compile():
+    ns = shadowproxy.uri_compile('socks://:8527')
+    assert ns.scheme == 'socks'
+    assert ns.proto == shadowproxy.SocksConnection
+    assert ns.kw['host'] == ''
+    assert ns.kw['port'] == 8527
