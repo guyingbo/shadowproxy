@@ -30,7 +30,7 @@ setup(
     py_modules = ['shadowproxy'],
     install_requires=[
         'pycryptodome>=3.4.3',
-        'curio>=0.6.0',
+        'curio==0.6',
         'pylru>=1.0.9',
     ],
     entry_points={
