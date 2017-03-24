@@ -14,12 +14,10 @@ with open(os.path.join(BASE_PATH, 'shadowproxy.py')) as f:
     except IndexError:
         raise RuntimeError('Unable to determine version.')
 
-long_description=open('README.md').read()
 
 setup(
     name='shadowproxy',
     description='A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.',
-    long_description=long_description,
     license='MIT',
     version=version,
     author='Yingbo Gu',
@@ -39,7 +37,7 @@ setup(
         ],
     },
     classifiers=[
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
     ],
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
