@@ -4,4 +4,4 @@ python:
 
 install: python setup.py install
 
-script: pytest
+script: python setup.py test
