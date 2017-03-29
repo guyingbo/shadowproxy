@@ -4,19 +4,19 @@
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_scheme}://[cipher:password@]{netloc}]
 support tcp schemes:
   local_scheme:   socks, ss, red, http, https
-  remote_scheme:  ssr
+  remote_scheme:  ss
 support udp schemes:
   local_scheme:   ssudp, tproxyudp, tunneludp
-  remote_scheme:  ssrudp
+  remote_scheme:  ssudp
 
 examples:
-  python3.6 %(prog)s -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888                     # socks5 --> shadowsocks
-  python3.6 %(prog)s -v http://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888                      # http   --> shadowsocks
-  python3.6 %(prog)s -v red://:12345=ssr://aes-256-cfb:password@127.0.0.1:8888                      # redir  --> shadowsocks
-  python3.6 %(prog)s -v ss://aes-256-cfb:password@:8888                                             # shadowsocks server (tcp)
-  python3.6 %(prog)s -v ssudp://aes-256-cfb:password@:8527                                          # shadowsocks server (udp)
-  python3.6 %(prog)s -v tunneludp://:8527#8.8.8.8:53=ssrudp://aes-256-cfb:password@127.0.0.1:8888   # tunnel --> shadowsocks (udp)
-  sudo python3.6 %(prog)s -v tproxyudp://:8527=ssrudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
+  shadowproxy -v socks://:8527=ss://aes-256-cfb:password@127.0.0.1:8888                     # socks5 --> shadowsocks
+  shadowproxy -v http://:8527=ss://aes-256-cfb:password@127.0.0.1:8888                      # http   --> shadowsocks
+  shadowproxy -v red://:12345=ss://aes-256-cfb:password@127.0.0.1:8888                      # redir  --> shadowsocks
+  shadowproxy -v ss://aes-256-cfb:password@:8888                                             # shadowsocks server (tcp)
+  shadowproxy -v ssudp://aes-256-cfb:password@:8527                                          # shadowsocks server (udp)
+  shadowproxy -v tunneludp://:8527#8.8.8.8:53=ssudp://aes-256-cfb:password@127.0.0.1:8888   # tunnel --> shadowsocks (udp)
+  sudo shadowproxy -v tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
 '''
 from Crypto import Random
 from Crypto.Cipher import AES
@@ -30,6 +30,7 @@ import ipaddress
 import traceback
 import argparse
 import weakref
+import base64
 import signal
 import struct
 import types
@@ -37,7 +38,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.1.1'
+__version__ = '0.1.7'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -59,6 +60,8 @@ local_networks = [
     '240.0.0.0/4',
 ]
 local_networks = [ipaddress.ip_network(s) for s in local_networks]
+HTTP_HEADER = re.compile('([^ ]+) +(.+?) +(HTTP/[^ ]+)')
+HTTP_LINE = re.compile(b'([^ ]+) +(.+?) +(HTTP/[^ ]+)')
 
 
 def is_local(host):
@@ -233,7 +236,7 @@ class ServerBase:
         if self.via_client:
             remote_stream = self.via_client.as_stream(remote_conn)
             try:
-                await remote_stream.client_init(self.taddr)
+                await self.via_client.init(self._stream, remote_stream, self.taddr)
             except Exception:
                 await remote_stream.close()
                 raise
@@ -270,6 +273,24 @@ class ServerBase:
 
     _relay2 = _relay
 
+    async def read_addr(self):
+        atyp = await self._stream.read_exactly(1)
+        if atyp == b'\x01':     # IPV4
+            data = await self._stream.read_exactly(4)
+            host = socket.inet_ntoa(ipv4)
+        elif atyp == b'\x04':   # IPV6
+            data = await self._stream.read_exactly(16)
+            host = socket.inet_ntop(socket.AF_INET6, ipv6)
+        elif atyp == b'\x03':   # hostname
+            data = await self._stream.read_exactly(1)
+            data += await self._stream.read_exactly(data[0])
+            host = data[1:].decode('ascii')
+        else:
+            raise Exception(f'unknow atyp: {atyp}') from None
+        data_port = await self._stream.read_exactly(2)
+        port = int.from_bytes(data_port, 'big')
+        return (host, port), atyp + data + data_port
+
 
 # Transparent proxy
 class RedirectConnection(ServerBase):
@@ -297,7 +318,7 @@ class RedirectConnection(ServerBase):
         self.on_disconnect_remote()
 
 
-class SSBase:
+class SSStream:
     def __repr__(self):
         return '<{} {}>'.format(self.__class__.__name__, self._stream)
 
@@ -326,6 +347,21 @@ class SSBase:
             self.decrypter = self.cipher_cls(self.password, iv)
         return self.decrypter.decrypt((await self._stream.read(maxbytes)))
 
+    async def read_until(self, bts):
+        # side-effect: read more data than you want,
+        # left those data in self.buffer, callers should handle this buffer themselves.
+        self.buffer = buf = bytearray()
+        while True:
+            bts_index = buf.find(bts)
+            if bts_index >= 0:
+                resp = bytes(buf[:bts_index+len(bts)])
+                del buf[:bts_index+len(bts)]
+                return resp
+            data = await self.read()
+            if data == b'':
+                raise EOFError('unexpect end of data')
+            buf.extend(data)
+
     async def write(self, data):
         # implement the same as official shadowsocks
         # send iv as late as possible
@@ -335,61 +371,29 @@ class SSBase:
         await self._stream.write(self.encrypter.encrypt(data))
         await self._stream.flush()
 
-    async def client_init(self, taddr):
-        await self._stream.write(self.encrypter.iv)
-        await self.write(pack_addr(taddr))
 
-
-class SSConnection(ServerBase, SSBase):
+class SSConnection(ServerBase):
     def __init__(self, cipher_cls, password, via=None):
         self.cipher_cls = cipher_cls
         self.password = password
         self.via = via
 
-    async def relay(self, remote_stream):
-        t1 = await spawn(self._relay(self, remote_stream))
-        t2 = await spawn(self._relay(remote_stream, self))
-        try:
-            async with wait([t1, t2]) as w:
-                task = await w.next_done()
-                result = await task.join()
-        except CancelledError:
-            pass
-        #async for task in wait([t1, t2]):
-        #    result = await task.join()
-            #print(task, 'quit')
-        #return await curio.gather([t1, t2])
+    def setup(self, stream, addr):
+        self._stream = SSStream()
+        self._stream._stream = stream
+        self._stream.cipher_cls = self.cipher_cls
+        self._stream.password = self.password
+        self.laddr = addr
 
     async def interact(self):
-        iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
-        self.decrypter = self.cipher_cls(self.password, iv)
         # don't send iv from start
-        # self.encrypter = self.cipher_cls(self.password)
-        # await self._stream.write(self.encrypter.iv)
-        self.taddr = await self.read_addr()
+        self.taddr, _ = await self.read_addr()
         remote_conn = await self.connect_remote()
         async with remote_conn:
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 await self.relay(remote_stream)
         self.on_disconnect_remote()
-
-    async def read_addr(self):
-        atyp = await self.read_exactly(1)
-        if atyp == b'\x01':     # IPV4
-            ipv4 = await self.read_exactly(4)
-            host = socket.inet_ntoa(ipv4)
-        elif atyp == b'\x04':   # IPV6
-            ipv6 = await self.read_exactly(16)
-            host = socket.inet_ntop(socket.AF_INET6, ipv6)
-        elif atyp == b'\x03':   # hostname
-            length = (await self.read_exactly(1))[0]
-            hostname = await self.read_exactly(length)
-            host = hostname.decode('ascii')
-        else:
-            raise Exception(f'unknow atyp: {atyp}') from None
-        port = int.from_bytes((await self.read_exactly(2)), 'big')
-        return (host, port)
 
 
 class SSClient:
@@ -402,16 +406,84 @@ class SSClient:
         return (await curio.open_connection(*self.raddr))
 
     def as_stream(self, conn):
-        stream = SSBase()
+        stream = SSStream()
         stream._stream = conn.as_stream()
         stream.encrypter = self.cipher_cls(self.password)
         stream.cipher_cls = self.cipher_cls
         stream.password = self.password
         return stream
 
+    async def init(self, server_stream, remote_stream, taddr):
+        await remote_stream._stream.write(remote_stream.encrypter.iv)
+        await remote_stream.write(pack_addr(taddr))
+
+
+class HTTPClient:
+    def __init__(self, auth, host, port):
+        self.auth = auth
+        self.raddr = (host, port)
+
+    async def connect(self):
+        return (await curio.open_connection(*self.raddr))
+
+    def as_stream(self, conn):
+        return conn.as_stream()
+
+    async def init(self, server_stream, remote_stream, taddr):
+        if taddr[1] != 443:
+            await self.init_http(server_stream, remote_stream, taddr)
+            return
+        headers_str = (
+            f'CONNECT {taddr[0]}:{taddr[1]} HTTP/1.1\r\n'
+            f'Host: {taddr[0]}:{taddr[1]}\r\n'
+            f'User-Agent: shadowproxy/{__version__}\r\n'
+            'Proxy-Connection: Keep-Alive\r\n'
+        )
+        if self.auth:
+            headers_str += 'Proxy-Authorization: Basic {}\r\n'.format(
+                    base64.b64encode(self.auth[0] + b':' + self.auth[1]).decode())
+        headers_str += '\r\n'
+        await remote_stream.write(headers_str.encode())
+        data = await read_until(remote_stream, b'\r\n\r\n')
+        if data.startswith(b'407'):
+            raise Exception(data)
+
+    async def init_http(self, server_stream, remote_stream, taddr):
+        data = await read_until(server_stream, b'\r\n\r\n')
+        headers = data[:-4].split(b'\r\n')
+        method, path, ver = HTTP_LINE.fullmatch(headers.pop(0)).groups()
+        headers.append(b'Proxy-Connection: Keep-Alive')
+        if self.auth:
+            headers.append(b'Proxy-Authorization: Basic %s\r\n' %\
+                           base64.b64encode(self.auth[0] + b':' + self.auth[1]))
+        url = urllib.parse.urlparse(path)
+        newpath = url._replace(scheme=b'http', netloc=('%s:%s'%taddr).encode()).geturl()
+        data = b'%b %b %b\r\n%b\r\n\r\n' % (method, newpath, ver, b'\r\n'.join(headers))
+        await remote_stream.write(data)
+        if hasattr(server_stream, 'buffer') and server_stream.buffer:
+            await remote_stream.write(server_stream.buffer)
+            del server_stream.buffer[:]
+
+
+async def read_until(stream, bts):
+    if hasattr(stream, 'read_until'):
+        return await stream.read_until(bts)
+    buf = stream._buffer
+    while True:
+        bts_index = buf.find(bts)
+        if bts_index >= 0:
+            resp = bytes(buf[:bts_index+len(bts)])
+            del buf[:bts_index+len(bts)]
+            return resp
+        data = await stream._read(65536)
+        if data == b'':
+            raise EOFError('unexpect end of data')
+        buf.extend(data)
+
 
 class SocksConnection(ServerBase):
-    def __init__(self, via=None):
+    def __init__(self, auth=None, via=None):
+        self.auth = auth
         self.via = via
 
     async def interact(self):
@@ -419,20 +491,34 @@ class SocksConnection(ServerBase):
         assert ver == 5, f'unknown socks version: {ver}'
         assert nmethods != 0, f'nmethods can not be 0'
         methods = await self._stream.read_exactly(nmethods)
-        if b'\x00' not in methods:
+        if self.auth and b'\x02' not in methods:
+            await self._stream.write(b'\05\xff')
+            raise Exception('server need auth')
+        elif b'\x00' not in methods:
             await self._stream.write(b'\x05\xff')
             raise Exception('method not support')
-        await self._stream.write(b'\x05\x00')
-        ver, cmd, rsv, atyp = struct.unpack('!BBBB', (await self._stream.read_exactly(4)))
+        if self.auth:
+            await self._stream.write(b'\x05\x02')
+            auth_ver, username_length = struct.unpack('!BB', await self._stream.read_exactly(2))
+            assert auth_ver == 1
+            username = await self._stream.read_exactly(username_length)
+            password_length = int.from_bytes(await self._stream.read_exactly(1), 'big')
+            password = await self._stream.read_exactly(password_length)
+            if (username, password_length) != self.auth:
+                await self._stream.write(b'\x01\x01')
+                raise Exception('auth failed')
+            else:
+                await self._stream.write(b'\x01\x00')
+        else:
+            await self._stream.write(b'\x05\x00')
+        ver, cmd, rsv = struct.unpack('!BBB', (await self._stream.read_exactly(3)))
         try:
             self.command = {1: 'connect', 2: 'bind', 3: 'associate'}[cmd]
         except KeyError:
             raise Exception(f'unknown cmd: {cmd}') from None
-        host, port, data = await self.read_addr(atyp)
+        self.taddr, data = await self.read_addr()
         if self.command == 'associate':
-            self.taddr = (self.laddr[0], port)
-        else:
-            self.taddr = (host, port)
+            self.taddr = (self.laddr[0], self.taddr[1])
         return await getattr(self, 'cmd_' + self.command)()
 
     async def cmd_connect(self):
@@ -483,32 +569,14 @@ class SocksConnection(ServerBase):
                 if verbose > 1:
                     traceback.print_exc()
 
-
     def _make_resp(self, code=0, host='0.0.0.0', port=0):
         return b'\x05' + code.to_bytes(1, 'big') + b'\x00' + \
                pack_addr((host, port))
 
-    async def read_addr(self, atyp):
-        if atyp == 1:   # IPV4
-            data = await self._stream.read_exactly(4)
-            host = socket.inet_ntoa(data)
-        elif atyp == 4: # IPV6
-            data = await self._stream.read_exactly(16)
-            host = socket.inet_ntop(socket.AF_INET6, data)
-        elif atyp == 3: # hostname
-            data = (await self._stream.read_exactly(1))
-            data += await self._stream.read_exactly(data[0])
-            host = data[1:].decode('ascii')
-        else:
-            raise Exception(f'unknow atyp: {atyp}') from None
-        data_port = await self._stream.read_exactly(2)
-        port = int.from_bytes(data_port, 'big')
-        return host, port, atyp.to_bytes(1, 'big') + data + data_port
 
-
-HTTP_HEADER = re.compile('([^ ]+) +(.+?) +(HTTP/[^ ]+)')
 class HTTPConnection(ServerBase):
-    def __init__(self, via=None):
+    def __init__(self, auth=None, via=None):
+        self.auth = auth
         self.via = via
 
     async def read_until(self, bts):
@@ -529,6 +597,16 @@ class HTTPConnection(ServerBase):
         headers = header_lines[:-4].decode().split('\r\n')
         method, path, ver = HTTP_HEADER.fullmatch(headers.pop(0)).groups()
         lines = '\r\n'.join(line for line in headers if not line.startswith('Proxy-'))
+        headers = dict(line.split(': ', 1) for line in headers)
+        if self.auth:
+            pauth = headers.get('Proxy-Authorization', None)
+            httpauth = 'Basic ' + base64.b64encode(b':'.join(self.auth)).decode()
+            if httpauth != pauth:
+                await self._stream.write(
+                    f'{ver} 407 Proxy Authentication Required\r\n'
+                    'Connection: close\r\n'
+                    'Proxy-Authenticate: Basic realm="simple"\r\n\r\n'.encode())
+                raise Exception('Unauthorized HTTP Request')
         if method == 'CONNECT':
             host, _, port = path.partition(':')
             self.taddr = (host, int(port))
@@ -556,7 +634,7 @@ class HTTPConnection(ServerBase):
                 data = await rstream.read()
                 if not data:
                     return
-                if b'\r\n' in data and HTTP_HEADER.fullmatch(data.split(b'\r\n', 1)[0].decode()):
+                if b'\r\n' in data and HTTP_LINE.fullmatch(data.split(b'\r\n', 1)[0]):
                     if b'\r\n\r\n' not in data:
                         data += await reader.read_until(b'\r\n\r\n')
                     header_lines, data = data.split(b'\r\n\r\n', 1)
@@ -792,19 +870,24 @@ class SSUDPServer:
             await via_client.relay(addr, listen_addr, sendto)
 
 
-protos = {
+server_protos = {
     'ss': SSConnection,
     'http': HTTPConnection,
     'https': HTTPConnection,
     'socks': SocksConnection,
     'red': RedirectConnection,
-    'ssr': SSClient,
     'ssudp': SSUDPServer,
     'tproxyudp': TProxyUDPServer,
     'tunneludp': TunnelUDPServer,
-    'ssrudp': SSUDPClient,
 }
-def uri_compile(uri):
+client_protos = {
+    'ss': SSClient,
+    'ssr': SSClient,
+    'ssudp': SSUDPClient,
+    'ssrudp': SSUDPClient,
+    'http': HTTPClient,
+}
+def uri_compile(uri, is_server):
     url = urllib.parse.urlparse(uri)
     kw = {}
     if url.scheme == 'tunneludp':
@@ -819,12 +902,17 @@ def uri_compile(uri):
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
         kw['ssl_context'] = ssl_context
-    proto = protos[url.scheme]
+    proto = server_protos[url.scheme] if is_server else client_protos[url.scheme]
     cipher, _, loc = url.netloc.rpartition('@')
     if cipher:
         cipher_cls, _, password = cipher.partition(':')
-        kw['cipher_cls'] = AES256CFBCipher
-        kw['password'] = password.encode()
+        if url.scheme.startswith('ss'):
+            kw['cipher_cls'] = AES256CFBCipher
+            kw['password'] = password.encode()
+        elif url.scheme in ('http', 'https', 'socks'):
+            kw['auth'] = (cipher_cls.encode(), password.encode())
+        else:
+            pass
     if loc:
         kw['host'], _, port = loc.partition(':')
         kw['port'] = int(port) if port else 1080
@@ -837,13 +925,13 @@ def get_server(uri):
     if not listen_uris:
         raise ValueError('no server found')
     if remote_uri:
-        remote = uri_compile(remote_uri)
+        remote = uri_compile(remote_uri, False)
         via = partial(remote.proto, **remote.kw)
     else:
         via = None
     server_list = []
     for listen_uri in listen_uris:
-        listen = uri_compile(listen_uri)
+        listen = uri_compile(listen_uri, True)
         if via:
             listen.kw['via'] = via
         host = listen.kw.pop('host')
@@ -929,4 +1017,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
