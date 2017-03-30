@@ -1,7 +1,8 @@
 #!/usr/bin/env python3.6
-'''Universal proxy server/client which support Socks5/HTTP/Shadowsocks/Redirect (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
+'''An universal proxy server/client which support Socks5/HTTP/Shadowsocks/Redirect (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
 
-uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_scheme}://[cipher:password@]{netloc}]
+uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment]
+            [{=remote_scheme}://[cipher:password@]{netloc}]
 support tcp schemes:
   local_scheme:   socks, ss, red, http, https
   remote_scheme:  ss
@@ -13,8 +14,8 @@ examples:
   shadowproxy -v socks://:8527=ss://aes-256-cfb:password@127.0.0.1:8888                     # socks5 --> shadowsocks
   shadowproxy -v http://:8527=ss://aes-256-cfb:password@127.0.0.1:8888                      # http   --> shadowsocks
   shadowproxy -v red://:12345=ss://aes-256-cfb:password@127.0.0.1:8888                      # redir  --> shadowsocks
-  shadowproxy -v ss://aes-256-cfb:password@:8888                                             # shadowsocks server (tcp)
-  shadowproxy -v ssudp://aes-256-cfb:password@:8527                                          # shadowsocks server (udp)
+  shadowproxy -v ss://aes-256-cfb:password@:8888                                            # shadowsocks server (tcp)
+  shadowproxy -v ssudp://aes-256-cfb:password@:8527                                         # shadowsocks server (udp)
   shadowproxy -v tunneludp://:8527#8.8.8.8:53=ssudp://aes-256-cfb:password@127.0.0.1:8888   # tunnel --> shadowsocks (udp)
   sudo shadowproxy -v tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
 '''
@@ -29,6 +30,7 @@ import urllib.parse
 import ipaddress
 import traceback
 import argparse
+import resource
 import weakref
 import base64
 import signal
@@ -48,7 +50,7 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 # IPV6_RECVORIGDSTADDR = IPV6_ORIGDSTADDR
 verbose = 0
 remote_num = 0
-print = partial(print, flush=True)
+# print = partial(print, flush=True)
 local_networks = [
     '0.0.0.0/8',
     '10.0.0.0/8',
@@ -60,7 +62,7 @@ local_networks = [
     '240.0.0.0/4',
 ]
 local_networks = [ipaddress.ip_network(s) for s in local_networks]
-HTTP_HEADER = re.compile('([^ ]+) +(.+?) +(HTTP/[^ ]+)')
+# HTTP_HEADER = re.compile('([^ ]+) +(.+?) +(HTTP/[^ ]+)')
 HTTP_LINE = re.compile(b'([^ ]+) +(.+?) +(HTTP/[^ ]+)')
 
 
@@ -100,17 +102,19 @@ class Stats:
     def reset(self):
         self.start = time.time()
         self.value = 0
+
+
 total_stats = Stats()
 
 
 def pack_addr(addr):
     host, port = addr
-    try: # IPV4
+    try:                    # IPV4
         packed = b'\x01' + socket.inet_aton(host)
     except OSError:
-        try: # IPV6
+        try:                # IPV6
             packed = b'\x04' + socket.inet_pton(socket.AF_INET6, host)
-        except OSError: # hostname
+        except OSError:     # hostname
             packed = host.encode('ascii')
             packed = b'\x03' + len(packed).to_bytes(1, 'big') + packed
     return packed + port.to_bytes(2, 'big')
@@ -118,15 +122,15 @@ def pack_addr(addr):
 
 def unpack_addr(data, start=0):
     atyp = data[start]
-    if atyp == 1:   # IPV4
+    if atyp == 1:       # IPV4
         end = start + 5
         ipv4 = data[start+1:end]
         host = socket.inet_ntoa(ipv4)
-    elif atyp == 4: # IPV6
+    elif atyp == 4:     # IPV6
         end = start + 17
         ipv6 = data[start:end]
         host = socket.inet_ntop(socket.AF_INET6, ipv6)
-    elif atyp == 3: # hostname
+    elif atyp == 3:     # hostname
         length = data[start+1]
         end = start + 2 + length
         host = data[start+2:end].decode('ascii')
@@ -137,11 +141,15 @@ def unpack_addr(data, start=0):
 
 
 readfunc = Random.new().read
+
+
 class BaseCipher:
     def get_key(self, password):
         keybuf = []
         while len(b''.join(keybuf)) < self.KEY_LENGTH:
-            keybuf.append(md5( (keybuf[-1] if keybuf else b'') + password).digest())
+            keybuf.append(md5(
+                (keybuf[-1] if keybuf else b'') + password
+            ).digest())
         return b''.join(keybuf)[:self.KEY_LENGTH]
 
     def __init__(self, password, iv=None):
@@ -162,8 +170,10 @@ class BaseCipher:
 class AES256CFBCipher(BaseCipher):
     KEY_LENGTH = 32
     IV_LENGTH = 16
+
     def setup(self):
-        self.cipher = AES.new(self.key, mode=AES.MODE_CFB, iv=self.iv, segment_size=128)
+        self.cipher = AES.new(self.key, mode=AES.MODE_CFB, iv=self.iv,
+                              segment_size=128)
 
 
 class ServerBase:
@@ -236,7 +246,8 @@ class ServerBase:
         if self.via_client:
             remote_stream = self.via_client.as_stream(remote_conn)
             try:
-                await self.via_client.init(self._stream, remote_stream, self.taddr)
+                await self.via_client.init(self._stream, remote_stream,
+                                           self.taddr)
             except Exception:
                 await remote_stream.close()
                 raise
@@ -250,7 +261,7 @@ class ServerBase:
         try:
             async with wait([t1, t2]) as w:
                 task = await w.next_done()
-                result = await task.join()
+                await task.join()
         except CancelledError:
             pass
 
@@ -277,10 +288,10 @@ class ServerBase:
         atyp = await self._stream.read_exactly(1)
         if atyp == b'\x01':     # IPV4
             data = await self._stream.read_exactly(4)
-            host = socket.inet_ntoa(ipv4)
+            host = socket.inet_ntoa(data)
         elif atyp == b'\x04':   # IPV6
             data = await self._stream.read_exactly(16)
-            host = socket.inet_ntop(socket.AF_INET6, ipv6)
+            host = socket.inet_ntop(socket.AF_INET6, data)
         elif atyp == b'\x03':   # hostname
             data = await self._stream.read_exactly(1)
             data += await self._stream.read_exactly(data[0])
@@ -304,7 +315,8 @@ class RedirectConnection(ServerBase):
             self.taddr = (socket.inet_ntoa(host), port)
         except Exception as e:
             if verbose > 0:
-                print(f'{self} error: {e}\nIt seems not been a proxy connection')
+                print(f'{self} error: {e}')
+                print('--> It is not a redirect proxy connection')
             await client.close()
             return
         return (await super().__call__(client, addr))
@@ -337,7 +349,7 @@ class SSStream:
         if not hasattr(self, 'decrypter'):
             iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
             self.decrypter = self.cipher_cls(self.password, iv)
-        return self.decrypter.decrypt((await self._stream.read_exactly(nbytes)))
+        return self.decrypter.decrypt(await self._stream.read_exactly(nbytes))
 
     async def read(self, maxbytes=-1):
         # patch for official shadowsocks
@@ -345,11 +357,12 @@ class SSStream:
         if not hasattr(self, 'decrypter'):
             iv = await self._stream.read_exactly(self.cipher_cls.IV_LENGTH)
             self.decrypter = self.cipher_cls(self.password, iv)
-        return self.decrypter.decrypt((await self._stream.read(maxbytes)))
+        return self.decrypter.decrypt(await self._stream.read(maxbytes))
 
     async def read_until(self, bts):
         # side-effect: read more data than you want,
-        # left those data in self.buffer, callers should handle this buffer themselves.
+        # left those data in self.buffer,
+        # callers should handle this buffer themselves.
         self.buffer = buf = bytearray()
         while True:
             bts_index = buf.find(bts)
@@ -423,6 +436,9 @@ class HTTPClient:
         self.auth = auth
         self.raddr = (host, port)
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__}: {self.raddr[0]}:{self.raddr[1]}>'
+
     async def connect(self):
         return (await curio.open_connection(*self.raddr))
 
@@ -441,12 +457,15 @@ class HTTPClient:
         )
         if self.auth:
             headers_str += 'Proxy-Authorization: Basic {}\r\n'.format(
-                    base64.b64encode(self.auth[0] + b':' + self.auth[1]).decode())
+                base64.b64encode(self.auth[0] + b':' + self.auth[1]).decode())
         headers_str += '\r\n'
         await remote_stream.write(headers_str.encode())
         data = await read_until(remote_stream, b'\r\n\r\n')
-        if data.startswith(b'407'):
-            raise Exception(data)
+        if not data.startswith(b'200'):
+            if verbose > 0:
+                print(f'{self!r} {data}')
+            if data.startswith(b'407'):
+                raise Exception(data)
 
     async def init_http(self, server_stream, remote_stream, taddr):
         data = await read_until(server_stream, b'\r\n\r\n')
@@ -454,11 +473,14 @@ class HTTPClient:
         method, path, ver = HTTP_LINE.fullmatch(headers.pop(0)).groups()
         headers.append(b'Proxy-Connection: Keep-Alive')
         if self.auth:
-            headers.append(b'Proxy-Authorization: Basic %s\r\n' %\
-                           base64.b64encode(self.auth[0] + b':' + self.auth[1]))
+            headers.append(
+                b'Proxy-Authorization: Basic %s\r\n' %
+                base64.b64encode(self.auth[0] + b':' + self.auth[1]))
         url = urllib.parse.urlparse(path)
-        newpath = url._replace(scheme=b'http', netloc=('%s:%s'%taddr).encode()).geturl()
-        data = b'%b %b %b\r\n%b\r\n\r\n' % (method, newpath, ver, b'\r\n'.join(headers))
+        newpath = url._replace(scheme=b'http',
+                               netloc=('%s:%s' % taddr).encode()).geturl()
+        data = b'%b %b %b\r\n%b\r\n\r\n' % (
+                method, newpath, ver, b'\r\n'.join(headers))
         await remote_stream.write(data)
         if hasattr(server_stream, 'buffer') and server_stream.buffer:
             await remote_stream.write(server_stream.buffer)
@@ -487,7 +509,8 @@ class SocksConnection(ServerBase):
         self.via = via
 
     async def interact(self):
-        ver, nmethods = struct.unpack('!BB', (await self._stream.read_exactly(2)))
+        ver, nmethods = struct.unpack(
+                '!BB', await self._stream.read_exactly(2))
         assert ver == 5, f'unknown socks version: {ver}'
         assert nmethods != 0, f'nmethods can not be 0'
         methods = await self._stream.read_exactly(nmethods)
@@ -499,19 +522,21 @@ class SocksConnection(ServerBase):
             raise Exception('method not support')
         if self.auth:
             await self._stream.write(b'\x05\x02')
-            auth_ver, username_length = struct.unpack('!BB', await self._stream.read_exactly(2))
+            auth_ver, username_length = struct.unpack(
+                    '!BB', await self._stream.read_exactly(2))
             assert auth_ver == 1
             username = await self._stream.read_exactly(username_length)
-            password_length = int.from_bytes(await self._stream.read_exactly(1), 'big')
+            password_length = (await self._stream.read_exactly(1))[0]
             password = await self._stream.read_exactly(password_length)
-            if (username, password_length) != self.auth:
+            if (username, password) != self.auth:
                 await self._stream.write(b'\x01\x01')
                 raise Exception('auth failed')
             else:
                 await self._stream.write(b'\x01\x00')
         else:
             await self._stream.write(b'\x05\x00')
-        ver, cmd, rsv = struct.unpack('!BBB', (await self._stream.read_exactly(3)))
+        ver, cmd, rsv = struct.unpack(
+                '!BBB', await self._stream.read_exactly(3))
         try:
             self.command = {1: 'connect', 2: 'bind', 3: 'associate'}[cmd]
         except KeyError:
@@ -594,33 +619,36 @@ class HTTPConnection(ServerBase):
 
     async def interact(self):
         header_lines = await self.read_until(b'\r\n\r\n')
-        headers = header_lines[:-4].decode().split('\r\n')
-        method, path, ver = HTTP_HEADER.fullmatch(headers.pop(0)).groups()
-        lines = '\r\n'.join(line for line in headers if not line.startswith('Proxy-'))
-        headers = dict(line.split(': ', 1) for line in headers)
+        headers = header_lines[:-4].split(b'\r\n')
+        method, path, ver = HTTP_LINE.fullmatch(headers.pop(0)).groups()
+        lines = b'\r\n'.join(
+                line for line in headers if not line.startswith(b'Proxy-'))
+        headers = dict(line.split(b': ', 1) for line in headers)
         if self.auth:
-            pauth = headers.get('Proxy-Authorization', None)
-            httpauth = 'Basic ' + base64.b64encode(b':'.join(self.auth)).decode()
+            pauth = headers.get(b'Proxy-Authorization', None)
+            httpauth = b'Basic ' + base64.b64encode(b':'.join(self.auth))
             if httpauth != pauth:
                 await self._stream.write(
-                    f'{ver} 407 Proxy Authentication Required\r\n'
-                    'Connection: close\r\n'
-                    'Proxy-Authenticate: Basic realm="simple"\r\n\r\n'.encode())
+                    ver + b' 407 Proxy Authentication Required\r\n'
+                    b'Connection: close\r\n'
+                    b'Proxy-Authenticate: Basic realm="simple"\r\n\r\n')
                 raise Exception('Unauthorized HTTP Request')
-        if method == 'CONNECT':
-            host, _, port = path.partition(':')
-            self.taddr = (host, int(port))
+        if method == b'CONNECT':
+            host, _, port = path.partition(b':')
+            self.taddr = (host.decode(), int(port))
         else:
             url = urllib.parse.urlparse(path)
-            self.taddr = (url.hostname, url.port or 80)
-            newpath = url._replace(netloc='', scheme='').geturl()
+            self.taddr = (url.hostname.decode(), url.port or 80)
+            newpath = url._replace(netloc=b'', scheme=b'').geturl()
         remote_conn = await self.connect_remote()
         async with remote_conn:
-            if method == 'CONNECT':
-                await self._stream.write(b'HTTP/1.1 200 Connection: Established\r\n\r\n')
+            if method == b'CONNECT':
+                await self._stream.write(
+                        b'HTTP/1.1 200 Connection: Established\r\n\r\n')
                 remote_req_headers = None
             else:
-                remote_req_headers = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode()
+                remote_req_headers = b'%s %s %s\r\n%s\r\n\r\n' % (
+                        method, newpath, ver, lines)
             remote_stream = await self.get_remote_stream(remote_conn)
             async with remote_stream:
                 if remote_req_headers:
@@ -628,36 +656,51 @@ class HTTPConnection(ServerBase):
                 await self.relay(remote_stream)
         self.on_disconnect_remote()
 
-    async def _relay(self, rstream, wstream):
-        try:
-            while True:
-                data = await rstream.read()
-                if not data:
-                    return
-                if b'\r\n' in data and HTTP_LINE.fullmatch(data.split(b'\r\n', 1)[0]):
-                    if b'\r\n\r\n' not in data:
-                        data += await reader.read_until(b'\r\n\r\n')
-                    header_lines, data = data.split(b'\r\n\r\n', 1)
-                    headers = header_lines[:-4].decode().split('\r\n')
-                    method, path, ver = HTTP_HEADER.fullmatch(headers.pop(0)).groups()
-                    lines = '\r\n'.join(line for line in headers if not line.startswith('Proxy-'))
-                    url = urllib.parse.urlparse(path)
-                    self.taddr = (url.hostname, url.port or 80)
-                    newpath = url._replace(netloc='', scheme='').geturl()
-                    data = f'{method} {newpath} {ver}\r\n{lines}\r\n\r\n'.encode() + data
-                await wstream.write(data)
-                self.stats.add(len(data))
-                total_stats.add(len(data))
-        except CancelledError:
-            pass
-        except Exception as e:
-            if verbose > 0:
-                print(f'{self} error: {e}')
-            if verbose > 1:
-                traceback.print_exc()
+    # async def interact_old(self):
+    #     header_lines = await self.read_until(b'\r\n\r\n')
+    #     headers = header_lines[:-4].decode().split('\r\n')
+    #     method, path, ver = HTTP_HEADER.fullmatch(headers.pop(0)).groups()
+    #     lines = '\r\n'.join(
+    #             line for line in headers if not line.startswith('Proxy-'))
+    #     headers = dict(line.split(': ', 1) for line in headers)
+    #     if self.auth:
+    #         pauth = headers.get('Proxy-Authorization', None)
+    #         httpauth = 'Basic ' + base64.b64encode(
+    #                 b':'.join(self.auth)).decode()
+    #         if httpauth != pauth:
+    #             await self._stream.write(
+    #                 f'{ver} 407 Proxy Authentication Required\r\n'
+    #                 'Connection: close\r\n'
+    #                 'Proxy-Authenticate: '
+    #                 'Basic realm="simple"\r\n\r\n'.encode()
+    #             )
+    #             raise Exception('Unauthorized HTTP Request')
+    #     if method == 'CONNECT':
+    #         host, _, port = path.partition(':')
+    #         self.taddr = (host, int(port))
+    #     else:
+    #         url = urllib.parse.urlparse(path)
+    #         self.taddr = (url.hostname, url.port or 80)
+    #         newpath = url._replace(netloc='', scheme='').geturl()
+    #     remote_conn = await self.connect_remote()
+    #     async with remote_conn:
+    #         if method == 'CONNECT':
+    #             await self._stream.write(
+    #                     b'HTTP/1.1 200 Connection: Established\r\n\r\n')
+    #             remote_req_headers = None
+    #         else:
+    #             remote_req_headers = f'{method} {newpath} {ver}\r\n'\
+    #                     f'{lines}\r\n\r\n'.encode()
+    #         remote_stream = await self.get_remote_stream(remote_conn)
+    #         async with remote_stream:
+    #             if remote_req_headers:
+    #                 await remote_stream.write(remote_req_headers)
+    #             await self.relay(remote_stream)
+    #     self.on_disconnect_remote()
 
 
-async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_address=True):
+async def udp_server(host, port, handler_task, *,
+                     family=socket.AF_INET, reuse_address=True):
     sock = socket.socket(family, socket.SOCK_DGRAM)
     try:
         sock.bind((host, port))
@@ -672,6 +715,7 @@ async def udp_server(host, port, handler_task, *, family=socket.AF_INET, reuse_a
 
 def Sendto():
     socks = weakref.WeakValueDictionary()
+
     async def sendto_from(bind_addr, data, addr):
         try:
             if bind_addr not in socks:
@@ -687,6 +731,8 @@ def Sendto():
             if verbose > 0:
                 print(e, bind_addr)
     return sendto_from
+
+
 sendto_from = Sendto()
 
 
@@ -700,14 +746,17 @@ class UDPClient:
 
     async def relay(self, addr, listen_addr, sendfunc=None):
         if self._relay_task is None:
-            self._relay_task = await spawn(self._relay(addr, listen_addr, sendfunc))
+            self._relay_task = await spawn(
+                    self._relay(addr, listen_addr, sendfunc))
 
     async def _relay(self, addr, listen_addr, sendfunc):
         try:
             while True:
                 data, raddr = await self.sock.recvfrom(8192)
                 if verbose > 0:
-                    print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {raddr[0]}:{raddr[1]}')
+                    print(f'udp: {addr[0]}:{addr[1]} <-- '
+                          f'{listen_addr[0]}:{listen_addr[1]} <-- '
+                          f'{raddr[0]}:{raddr[1]}')
                 if sendfunc is None:
                     await sendto_from(raddr, data, addr)
                 else:
@@ -746,7 +795,10 @@ class SSUDPClient(UDPClient):
                 data, _ = await self.sock.recvfrom(8192)
                 payload, taddr = self._unpack(data)
                 if verbose > 0:
-                    print(f'udp: {addr[0]}:{addr[1]} <-- {listen_addr[0]}:{listen_addr[1]} <-- {self.raddr[0]}:{self.raddr[1]} <-- {self.taddr[0]}:{self.taddr[1]}')
+                    print(f'udp: {addr[0]}:{addr[1]} <-- '
+                          f'{listen_addr[0]}:{listen_addr[1]} <-- '
+                          f'{self.raddr[0]}:{self.raddr[1]} <-- '
+                          f'{self.taddr[0]}:{self.taddr[1]}')
                 if sendfunc is None:
                     await sendto_from(self.taddr, payload, addr)
                 else:
@@ -759,6 +811,7 @@ class TProxyUDPServer:
     def __init__(self, via=None):
         self.via = via
         self.removed = None
+
         def callback(key, value):
             self.removed = (key, value)
         import pylru
@@ -776,8 +829,10 @@ class TProxyUDPServer:
         sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
         listen_addr = sock.getsockname()
         while True:
-            data, ancdata, msg_flags, addr = await sock.recvmsg(8192, socket.CMSG_SPACE(24))
-            #info = await socket.getaddrinfo(*addr, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
+            data, ancdata, msg_flags, addr = await sock.recvmsg(
+                    8192, socket.CMSG_SPACE(24))
+            # info = await socket.getaddrinfo(
+            #         *addr, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
             taddr = self.get_origin_dst(ancdata)
             if taddr is None:
                 if verbose > 0:
@@ -796,7 +851,9 @@ class TProxyUDPServer:
             via_client = self.addr2client[addr]
             vaddr = via_client.raddr
             if verbose > 0:
-                print(f'udp: {addr[0]}:{addr[1]} --> {listen_addr[0]}:{listen_addr[1]} --> {vaddr[0]}:{vaddr[1]} --> {taddr[0]}:{taddr[1]}')
+                print(f'udp: {addr[0]}:{addr[1]} --> '
+                      f'{listen_addr[0]}:{listen_addr[1]} --> '
+                      f'{vaddr[0]}:{vaddr[1]} --> {taddr[0]}:{taddr[1]}')
             await via_client.sendto(data, taddr)
             await via_client.relay(addr, listen_addr)
 
@@ -806,6 +863,7 @@ class TunnelUDPServer:
         self.taddr = target_addr
         self.via = via
         self.removed = None
+
         def callback(key, value):
             self.removed = (key, value)
         import pylru
@@ -825,7 +883,9 @@ class TunnelUDPServer:
             via_client = self.addr2client[addr]
             vaddr = via_client.raddr
             if verbose > 0:
-                print(f'udp: {addr[0]}:{addr[1]} --> {listen_addr[0]}:{listen_addr[1]} --> {vaddr[0]}:{vaddr[1]} --> {taddr[0]}:{taddr[1]}')
+                print(f'udp: {addr[0]}:{addr[1]} --> '
+                      f'{listen_addr[0]}:{listen_addr[1]} --> '
+                      f'{vaddr[0]}:{vaddr[1]} --> {taddr[0]}:{taddr[1]}')
             await via_client.sendto(data, taddr)
             await via_client.relay(addr, listen_addr, sock.sendto)
 
@@ -836,6 +896,7 @@ class SSUDPServer:
         self.cipher_cls = cipher_cls
         self.password = password
         self.removed = None
+
         def callback(key, value):
             self.removed = (key, value)
         import pylru
@@ -859,7 +920,9 @@ class SSUDPServer:
             data = decrypter.decrypt(data[self.cipher_cls.IV_LENGTH:])
             taddr, payload = unpack_addr(data)
             if verbose > 0:
-                print(f'udp: {addr[0]}:{addr[1]} --> {listen_addr[0]}:{listen_addr[1]} --> {taddr[0]}:{taddr[1]}')
+                print(f'udp: {addr[0]}:{addr[1]} --> '
+                      f'{listen_addr[0]}:{listen_addr[1]} --> '
+                      f'{taddr[0]}:{taddr[1]}')
             await via_client.sendto(payload, taddr)
 
             async def sendto(data, taddr):
@@ -887,12 +950,16 @@ client_protos = {
     'ssrudp': SSUDPClient,
     'http': HTTPClient,
 }
+
+
 def uri_compile(uri, is_server):
     url = urllib.parse.urlparse(uri)
     kw = {}
     if url.scheme == 'tunneludp':
         if not url.fragment:
-            raise argparse.ArgumentTypeError('destitation must be assign in tunnel udp mode, example tunneludp://:53#8.8.8.8:53')
+            raise argparse.ArgumentTypeError(
+                    'destitation must be assign in tunnel udp mode, '
+                    'example tunneludp://:53#8.8.8.8:53')
         host, _, port = url.fragment.partition(':')
         kw['target_addr'] = (host, int(port))
     if url.scheme in ('https',):
@@ -902,7 +969,8 @@ def uri_compile(uri, is_server):
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
         kw['ssl_context'] = ssl_context
-    proto = server_protos[url.scheme] if is_server else client_protos[url.scheme]
+    proto = server_protos[url.scheme] if is_server else \
+        client_protos[url.scheme]
     cipher, _, loc = url.netloc.rpartition('@')
     if cipher:
         cipher_cls, _, password = cipher.partition(':')
@@ -938,12 +1006,14 @@ def get_server(uri):
         port = listen.kw.pop('port')
         ssl_context = listen.kw.pop('ssl_context', None)
         if listen.scheme in ('ss', 'ssudp') and 'cipher_cls' not in listen.kw:
-            raise argparse.ArgumentTypeError('you need to assign cryto algorithm and password: '
-                                             f'{listen.scheme}://{host}:{port}')
+            raise argparse.ArgumentTypeError(
+                    'you need to assign cryto algorithm and password: '
+                    f'{listen.scheme}://{host}:{port}')
         if listen.scheme.endswith('udp'):
             server = udp_server(host, port, listen.proto(**listen.kw))
         else:
-            server = tcp_server(host, port, ProtoFactory(listen.proto, **listen.kw), backlog=1024, ssl=ssl_context)
+            server = tcp_server(host, port, ProtoFactory(
+                listen.proto, **listen.kw), backlog=1024, ssl=ssl_context)
         server_list.append((server, (host, port), listen.scheme))
     return server_list
 
@@ -956,11 +1026,12 @@ async def multi_server(*servers):
             task = await spawn(server)
             tasks.append(task)
             addrs.append((*addr, scheme))
-    address = ', '.join(f'{scheme}://{host}:{port}' for host, port, scheme in addrs)
+    address = ', '.join(
+            f'{scheme}://{host}:{port}' for host, port, scheme in addrs)
     ss_filter = 'or '.join(f'dport = {port}' for host, port, scheme in addrs)
     pid = os.getpid()
     if verbose > 0:
-        print(f'listen on {address} pid: {pid}')
+        print(f'{__name__}/{__version__} listen on {address} pid: {pid}')
         print(f'sudo lsof -p {pid} -P | grep -e TCP -e STREAM')
         print(f'ss -o "( {ss_filter} )"')
     tasks.append((await spawn(show_stats())))
@@ -968,6 +1039,8 @@ async def multi_server(*servers):
 
 
 connections = weakref.WeakSet()
+
+
 def ProtoFactory(cls, *args, **kwargs):
     async def client_handler(client, addr):
         handler = cls(*args, **kwargs)
@@ -981,18 +1054,25 @@ async def show_stats():
     print(f'kill -USR1 {pid} to show connections')
     while True:
         async with SignalSet(signal.SIGUSR1) as sig:
-            signo = await sig.wait()
+            await sig.wait()
             for conn in connections:
                 print(f'| {conn} ({conn.stats})')
             n = len(connections)
-            print('-'*15, f'{n} connections, {total_stats} ( {total_stats.get_speed()} )', '-'*15)
+            print('-'*15,
+                  f'{n} connections, {total_stats} '
+                  f'( {total_stats.get_speed()} )',
+                  '-'*15)
             total_stats.reset()
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-v', dest='verbose', action='count', default=0, help='print verbose output')
-    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
+    parser = argparse.ArgumentParser(
+            description=__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-v', dest='verbose', action='count', default=0,
+                        help='print verbose output')
+    parser.add_argument('--version', action='version',
+                        version=f'%(prog)s {__version__}')
     parser.add_argument('--monitor', dest='monitor', action='store_true')
     parser.add_argument('server', nargs='+', type=get_server)
     args = parser.parse_args()
@@ -1014,6 +1094,7 @@ def main():
     except KeyboardInterrupt:
         kernel.run(shutdown=True)
         print()
+
 
 if __name__ == '__main__':
     main()
