@@ -11,21 +11,21 @@ Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
 This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy), and some part of http proxy code was copy from it.
 
 
-It is a replacement of shadowsocks and shadowsocks-libev, one can replace ss-redir, ss-tunnel, ss-server, ss-local with shadowproxy.py
+It is a replacement of shadowsocks and shadowsocks-libev, you can replace ss-redir, ss-tunnel, ss-server, ss-local with shadowproxy.py
 
 ## Usage
 
 ```
 usage: shadowproxy [-h] [-v] [--version] [--monitor] server [server ...]
 
-uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_scheme}://[cipher:password@]{netloc}]
+uri syntax: {server_scheme}://[cipher:password@]{netloc}[#fragment][{=client_scheme}://[cipher:password@]{netloc}]
 
 support tcp schemes:
-  local_scheme:   socks, ss, red, http, https
-  remote_scheme:  ss, http
+  server_scheme: socks, ss, red, http, https
+  client_scheme: ss, http
 support udp schemes:
-  local_scheme:   ssudp, tproxyudp, tunneludp
-  remote_scheme:  ssudp
+  server_scheme: ssudp, tproxyudp, tunneludp
+  client_scheme: ssudp
 ```
 
 examples:
