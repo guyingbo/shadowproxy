@@ -18,8 +18,11 @@ def test_unpack_addr():
 
 
 def test_uri_compile():
-    ns = shadowproxy.uri_compile('socks://:8527')
+    ns = shadowproxy.uri_compile('socks://:8527', True)
     assert ns.scheme == 'socks'
     assert ns.proto == shadowproxy.SocksConnection
     assert ns.kw['host'] == ''
     assert ns.kw['port'] == 8527
+    ns = shadowproxy.uri_compile('ss://aes-256-cfb:passwd@:8527', False)
+    assert ns.scheme == 'ss'
+    assert ns.proto == shadowproxy.SSClient
