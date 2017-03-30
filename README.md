@@ -22,26 +22,26 @@ uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment][{=remote_sche
 
 support tcp schemes:
   local_scheme:   socks, ss, red, http, https
-  remote_scheme:  ssr
+  remote_scheme:  ss, http
 support udp schemes:
   local_scheme:   ssudp, tproxyudp, tunneludp
-  remote_scheme:  ssrudp
+  remote_scheme:  ssudp
 ```
 
 examples:
 
 ```
 # socks5 --> shadowsocks
-shadowproxy -v socks://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888
+shadowproxy -v socks://:8527=ss://aes-256-cfb:password@127.0.0.1:8888
 
 # http   --> shadowsocks
-shadowproxy -v http://:8527=ssr://aes-256-cfb:password@127.0.0.1:8888
+shadowproxy -v http://:8527=ss://aes-256-cfb:password@127.0.0.1:8888
 
 # https  --> shadowsocks
-shadowproxy -v https://:8527#keyfile,certfile=ssr://aes-256-cfb:password@127.0.0.1:8888
+shadowproxy -v https://:8527#keyfile,certfile=ss://aes-256-cfb:password@127.0.0.1:8888
 
 # redir  --> shadowsocks
-shadowproxy -v red://:12345=ssr://aes-256-cfb:password@127.0.0.1:8888
+shadowproxy -v red://:12345=ss://aes-256-cfb:password@127.0.0.1:8888
 
 # shadowsocks server (tcp)
 shadowproxy -v ss://aes-256-cfb:password@:8888
@@ -50,10 +50,10 @@ shadowproxy -v ss://aes-256-cfb:password@:8888
 shadowproxy -v ssudp://aes-256-cfb:password@:8527
 
 # tunnel --> shadowsocks (udp)
-shadowproxy -v tunneludp://:8527#8.8.8.8:53=ssrudp://aes-256-cfb:password@127.0.0.1:8888
+shadowproxy -v tunneludp://:8527#8.8.8.8:53=ssudp://aes-256-cfb:password@127.0.0.1:8888
 
 # tproxy --> shadowsocks (udp)
-shadowproxy -v tproxyudp://:8527=ssrudp://aes-256-cfb:password@127.0.0.1:8888
+shadowproxy -v tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888
 ```
 
 ## Installation
