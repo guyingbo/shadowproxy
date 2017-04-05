@@ -20,7 +20,7 @@ examples:
   sudo shadowproxy -v tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
 '''
 from Crypto import Random
-from Crypto.Cipher import AES
+from Crypto.Cipher import AES, ChaCha20, Salsa20, ARC4
 from hashlib import md5
 from curio import spawn, tcp_server, socket, CancelledError, wait, ssl
 from curio.signal import SignalSet
@@ -40,7 +40,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -174,6 +174,38 @@ class AES256CFBCipher(BaseCipher):
     def setup(self):
         self.cipher = AES.new(self.key, mode=AES.MODE_CFB, iv=self.iv,
                               segment_size=128)
+
+
+class AES128CFBCipher(AES256CFBCipher):
+    KEY_LENGTH = 16
+
+
+class AES192CFBCipher(AES256CFBCipher):
+    KEY_LENGTH = 24
+
+
+class ChaCha20Cipher(BaseCipher):
+    KEY_LENGTH = 32
+    IV_LENGTH = 8
+
+    def setup(self):
+        self.cipher = ChaCha20.new(key=self.key, nonce=self.iv)
+
+
+class Salsa20Cipher(BaseCipher):
+    KEY_LENGTH = 32
+    IV_LENGTH = 8
+
+    def setup(self):
+        self.cipher = Salsa20.new(key=self.key, nonce=self.iv)
+
+
+class RC4Cipher(BaseCipher):
+    KEY_LENGTH = 16
+    IV_LENGTH = 0
+
+    def setup(self):
+        self.cipher = ARC4.new(self.key)
 
 
 class ServerBase:
@@ -950,6 +982,14 @@ client_protos = {
     'ssrudp': SSUDPClient,
     'http': HTTPClient,
 }
+ciphers = {
+    'aes-256-cfb': AES256CFBCipher,
+    'aes-128-cfb': AES128CFBCipher,
+    'aes-192-cfb': AES192CFBCipher,
+    'chacha20': ChaCha20Cipher,
+    'salsa20': Salsa20Cipher,
+    'rc4': RC4Cipher,
+}
 
 
 def uri_compile(uri, is_server):
@@ -975,7 +1015,7 @@ def uri_compile(uri, is_server):
     if cipher:
         cipher_cls, _, password = cipher.partition(':')
         if url.scheme.startswith('ss'):
-            kw['cipher_cls'] = AES256CFBCipher
+            kw['cipher_cls'] = ciphers[cipher_cls]
             kw['password'] = password.encode()
         elif url.scheme in ('http', 'https', 'socks'):
             kw['auth'] = (cipher_cls.encode(), password.encode())
