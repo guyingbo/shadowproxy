@@ -40,7 +40,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -50,7 +50,7 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 # IPV6_RECVORIGDSTADDR = IPV6_ORIGDSTADDR
 verbose = 0
 remote_num = 0
-# print = partial(print, flush=True)
+print = partial(print, flush=True)
 local_networks = [
     '0.0.0.0/8',
     '10.0.0.0/8',
@@ -493,10 +493,10 @@ class HTTPClient:
         headers_str += '\r\n'
         await remote_stream.write(headers_str.encode())
         data = await read_until(remote_stream, b'\r\n\r\n')
-        if not data.startswith(b'200'):
+        if not data.startswith(b'HTTP/1.1 200 OK'):
             if verbose > 0:
                 print(f'{self!r} {data}')
-            if data.startswith(b'407'):
+            if data.startswith(b'HTTP/1.1 407'):
                 raise Exception(data)
 
     async def init_http(self, server_stream, remote_stream, taddr):
