@@ -40,7 +40,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.1.9'
+__version__ = '0.2.0'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -792,7 +792,7 @@ class UDPClient:
                 if sendfunc is None:
                     await sendto_from(raddr, data, addr)
                 else:
-                    await sendfunc(data, addr)
+                    await sendfunc(data, raddr)
         except CancelledError:
             pass
 
