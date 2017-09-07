@@ -40,7 +40,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.2.0'
+__version__ = '0.2.2'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -670,6 +670,14 @@ class HTTPConnection(ServerBase):
             self.taddr = (host.decode(), int(port))
         else:
             url = urllib.parse.urlparse(path)
+            if not url.hostname:
+                await self._stream.write(
+                        b'HTTP/1.1 200 OK\r\n'
+                        b'Connection: close\r\n'
+                        b'Content-Type: text/plain\r\n'
+                        b'Content-Length: 2\r\n\r\n'
+                        b'ok')
+                return
             self.taddr = (url.hostname.decode(), url.port or 80)
             newpath = url._replace(netloc=b'', scheme=b'').geturl()
         remote_conn = await self.connect_remote()
