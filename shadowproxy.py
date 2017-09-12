@@ -1,5 +1,8 @@
 #!/usr/bin/env python3.6
-'''An universal proxy server/client which support Socks5/HTTP/Shadowsocks/Redirect (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
+'''
+An universal proxy server/client which support
+Socks5/HTTP/Shadowsocks/Redirect (tcp) and
+Shadowsocks/TProxy/Tunnel (udp) protocols.
 
 uri syntax: {local_scheme}://[cipher:password@]{netloc}[#fragment]
             [{=remote_scheme}://[cipher:password@]{netloc}]
@@ -11,24 +14,43 @@ support udp schemes:
   remote_scheme:  ssudp
 
 examples:
-  shadowproxy -v socks://:8527=ss://aes-256-cfb:password@127.0.0.1:8888                     # socks5 --> shadowsocks
-  shadowproxy -v http://:8527=ss://aes-256-cfb:password@127.0.0.1:8888                      # http   --> shadowsocks
-  shadowproxy -v red://:12345=ss://aes-256-cfb:password@127.0.0.1:8888                      # redir  --> shadowsocks
-  shadowproxy -v ss://aes-256-cfb:password@:8888                                            # shadowsocks server (tcp)
-  shadowproxy -v ssudp://aes-256-cfb:password@:8527                                         # shadowsocks server (udp)
-  shadowproxy -v tunneludp://:8527#8.8.8.8:53=ssudp://aes-256-cfb:password@127.0.0.1:8888   # tunnel --> shadowsocks (udp)
-  sudo shadowproxy -v tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888         # tproxy --> shadowsocks (udp)
+  # http(s) proxy
+  shadowproxy -v http://:8527
+
+  # socks5 --> shadowsocks
+  shadowproxy -v socks://:8527=ss://aes-256-cfb:password@127.0.0.1:8888
+
+  # http   --> shadowsocks
+  shadowproxy -v http://:8527=ss://aes-256-cfb:password@127.0.0.1:8888
+
+  # redir  --> shadowsocks
+  shadowproxy -v red://:12345=ss://aes-256-cfb:password@127.0.0.1:8888
+
+  # shadowsocks server (tcp)
+  shadowproxy -v ss://aes-256-cfb:password@:8888
+
+  # shadowsocks server (udp)
+  shadowproxy -v ssudp://aes-256-cfb:password@:8527
+
+  # tunnel --> shadowsocks (udp)
+  shadowproxy -v \
+tunneludp://:8527#8.8.8.8:53=ssudp://aes-256-cfb:password@127.0.0.1:8888
+
+  # tproxy --> shadowsocks (udp)
+  sudo shadowproxy -v \
+tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888
 '''
 from Crypto import Random
 from Crypto.Cipher import AES, ChaCha20, Salsa20, ARC4
 from hashlib import md5
-from curio import spawn, tcp_server, socket, CancelledError, wait, ssl
-from curio.signal import SignalSet
+from curio import spawn, tcp_server, socket, CancelledError, TaskGroup, ssl
+from curio.signal import SignalEvent
+from microstats import MicroStats
 from functools import partial
-import time
 import urllib.parse
 import ipaddress
 import traceback
+import httptools
 import argparse
 import resource
 import weakref
@@ -40,7 +62,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20
@@ -64,6 +86,7 @@ local_networks = [
 local_networks = [ipaddress.ip_network(s) for s in local_networks]
 # HTTP_HEADER = re.compile('([^ ]+) +(.+?) +(HTTP/[^ ]+)')
 HTTP_LINE = re.compile(b'([^ ]+) +(.+?) +(HTTP/[^ ]+)')
+stats = MicroStats()
 
 
 def is_local(host):
@@ -72,39 +95,6 @@ def is_local(host):
     except ValueError:
         return False
     return any(address in nw for nw in local_networks)
-
-
-class Stats:
-    def __init__(self):
-        self.reset()
-
-    def __repr__(self):
-        t = int(time.time() - self.start)
-        if self.value < 1024:
-            return f'{self.value:d}Bytes in {t}s'
-        elif self.value < 1048576:
-            return f'{self.value//1024:d}KB in {t}s'
-        else:
-            return f'{self.value/1048576:.1f}MB in {t}s'
-
-    def get_speed(self):
-        speed = self.value / (time.time() - self.start)
-        if speed < 1024:
-            return f'{speed:.0f} B/s'
-        elif speed < 1048576:
-            return f'{speed/1024:.0f} KB/s'
-        else:
-            return f'{speed/1048576:.0f} MB/s'
-
-    def add(self, v):
-        self.value += v
-
-    def reset(self):
-        self.start = time.time()
-        self.value = 0
-
-
-total_stats = Stats()
 
 
 def pack_addr(addr):
@@ -232,7 +222,6 @@ class ServerBase:
         self.laddr = addr
 
     async def __call__(self, client, addr):
-        self.stats = Stats()
         try:
             async with client:
                 self.setup(client.as_stream(), addr)
@@ -268,11 +257,10 @@ class ServerBase:
         return
         if getattr(self, 'via', None):
             if verbose > 0:
-                print(f'Disconnect {self} ({self.stats})')
+                print(f'Disconnect {self}')
         else:
             if verbose > 0:
-                print(f'Disconnect {self} ({self.stats})')
-        # self.stats.reset()
+                print(f'Disconnect {self}')
 
     async def get_remote_stream(self, remote_conn):
         if self.via_client:
@@ -291,8 +279,8 @@ class ServerBase:
         t1 = await spawn(self._relay(self._stream, remote_stream))
         t2 = await spawn(self._relay2(remote_stream, self._stream))
         try:
-            async with wait([t1, t2]) as w:
-                task = await w.next_done()
+            async with TaskGroup([t1, t2]) as g:
+                task = await g.next_done(cancel_remaining=True)
                 await task.join()
         except CancelledError:
             pass
@@ -304,8 +292,7 @@ class ServerBase:
                 if not data:
                     return
                 await wstream.write(data)
-                self.stats.add(len(data))
-                total_stats.add(len(data))
+                stats.incr('traffic', len(data))
         except CancelledError:
             pass
         except Exception as e:
@@ -631,7 +618,7 @@ class SocksConnection(ServerBase):
                pack_addr((host, port))
 
 
-class HTTPConnection(ServerBase):
+class OldHTTPConnection(ServerBase):
     def __init__(self, auth=None, via=None):
         self.auth = auth
         self.via = via
@@ -696,47 +683,157 @@ class HTTPConnection(ServerBase):
                 await self.relay(remote_stream)
         self.on_disconnect_remote()
 
-    # async def interact_old(self):
-    #     header_lines = await self.read_until(b'\r\n\r\n')
-    #     headers = header_lines[:-4].decode().split('\r\n')
-    #     method, path, ver = HTTP_HEADER.fullmatch(headers.pop(0)).groups()
-    #     lines = '\r\n'.join(
-    #             line for line in headers if not line.startswith('Proxy-'))
-    #     headers = dict(line.split(': ', 1) for line in headers)
-    #     if self.auth:
-    #         pauth = headers.get('Proxy-Authorization', None)
-    #         httpauth = 'Basic ' + base64.b64encode(
-    #                 b':'.join(self.auth)).decode()
-    #         if httpauth != pauth:
-    #             await self._stream.write(
-    #                 f'{ver} 407 Proxy Authentication Required\r\n'
-    #                 'Connection: close\r\n'
-    #                 'Proxy-Authenticate: '
-    #                 'Basic realm="simple"\r\n\r\n'.encode()
-    #             )
-    #             raise Exception('Unauthorized HTTP Request')
-    #     if method == 'CONNECT':
-    #         host, _, port = path.partition(':')
-    #         self.taddr = (host, int(port))
-    #     else:
-    #         url = urllib.parse.urlparse(path)
-    #         self.taddr = (url.hostname, url.port or 80)
-    #         newpath = url._replace(netloc='', scheme='').geturl()
-    #     remote_conn = await self.connect_remote()
-    #     async with remote_conn:
-    #         if method == 'CONNECT':
-    #             await self._stream.write(
-    #                     b'HTTP/1.1 200 Connection: Established\r\n\r\n')
-    #             remote_req_headers = None
-    #         else:
-    #             remote_req_headers = f'{method} {newpath} {ver}\r\n'\
-    #                     f'{lines}\r\n\r\n'.encode()
-    #         remote_stream = await self.get_remote_stream(remote_conn)
-    #         async with remote_stream:
-    #             if remote_req_headers:
-    #                 await remote_stream.write(remote_req_headers)
-    #             await self.relay(remote_stream)
-    #     self.on_disconnect_remote()
+
+class CIDict(dict):
+    """Case Insensitive dict where all keys are converted to lowercase
+    This does not maintain the inputted case when calling items() or keys()
+    in favor of speed, since headers are case insensitive
+    """
+
+    def get(self, key, default=None):
+        return super().get(key.casefold(), default)
+
+    def __getitem__(self, key):
+        return super().__getitem__(key.casefold())
+
+    def __setitem__(self, key, value):
+        return super().__setitem__(key.casefold(), value)
+
+    def __contains__(self, key):
+        return super().__contains__(key.casefold())
+
+
+class HTTPProxyProtocol:
+    def __init__(self):
+        self._header_fragment = b''
+        self.headers = []
+        self.need_proxy_data = True
+        self.buffer = bytearray()
+
+    def on_header(self, name, value):
+        self._header_fragment += name
+
+        if value is not None:
+            self.headers.append(
+                    (self._header_fragment.decode().casefold(),
+                     value.decode()))
+
+            self._header_fragment = b''
+
+    def on_headers_complete(self):
+        self.headers_dict = CIDict(self.headers)
+        self.need_proxy_data = False
+
+    def on_body(self, body: bytes):
+        self.buffer.extend(body)
+
+    def on_url(self, url: bytes):
+        self.url = url
+
+
+class HTTPConnection(ServerBase):
+    def __init__(self, auth=None, via=None):
+        self.auth = auth
+        self.via = via
+
+    async def __call__(self, client, addr):
+        self.laddr = addr
+        try:
+            async with client:
+                await self.interact(client)
+        except Exception as e:
+            if verbose > 0:
+                print(f'{self} error: {e}')
+            if verbose > 1:
+                traceback.print_exc()
+
+    async def interact(self, client):
+        protocol = HTTPProxyProtocol()
+        parser = httptools.HttpRequestParser(protocol)
+        s = b''
+
+        while protocol.need_proxy_data:
+            data = await client.recv(65536)
+            if not data:
+                break
+            s += data
+            try:
+                parser.feed_data(data)
+            except httptools.HttpParserUpgrade as e:
+                break
+
+        version = parser.get_http_version()
+        if version == '0.0':
+            return
+        if self.auth:
+            pauth = protocol.headers_dict.get(b'Proxy-Authenticate', None)
+            httpauth = b'Basic ' + base64.b64encode(b':'.join(self.auth))
+            if httpauth != pauth:
+                await client.sendall(
+                    version + b' 407 Proxy Authentication Required\r\n'
+                    b'Connection: close\r\n'
+                    b'Proxy-Authenticate: Basic realm="simple"\r\n\r\n')
+                raise Exception('Unauthorized HTTP Required')
+
+        method = parser.get_method()
+        if method == b'CONNECT':
+            host, _, port = protocol.url.partition(b':')
+            self.taddr = (host.decode(), int(port))
+        else:
+            url = urllib.parse.urlparse(protocol.url)
+            if not url.hostname:
+                await client.sendall(
+                        b'HTTP/1.1 200 OK\r\n'
+                        b'Connection: close\r\n'
+                        b'Content-Type: text/plain\r\n'
+                        b'Content-Length: 2\r\n\r\n'
+                        b'ok')
+                return
+            self.taddr = (url.hostname.decode(), url.port or 80)
+            newpath = url._replace(netloc=b'', scheme=b'').geturl()
+        remote_conn = await self.connect_remote()
+        async with remote_conn:
+            if method == b'CONNECT':
+                await client.sendall(
+                    b'HTTP/1.1 200 Connection: Established\r\n\r\n')
+            else:
+                header_lines = '\r\n'.join(
+                    f'{k}: {v}' for k, v in protocol.headers
+                    if not k[:6] == 'Proxy-'
+                )
+                header_lines = header_lines.encode()
+                remote_req_headers = b'%s %s HTTP/%s\r\n%s\r\n\r\n' % (
+                    method, newpath, version.encode(), header_lines)
+                await remote_conn.sendall(remote_req_headers)
+            if protocol.buffer:
+                await client.sendall(protocol.buffer)
+            await self.relay(client, remote_conn)
+
+    async def relay(self, conn, remote_conn):
+        t1 = await spawn(self._relay(conn, remote_conn))
+        t2 = await spawn(self._relay(remote_conn, conn))
+        try:
+            async with TaskGroup([t1, t2]) as g:
+                task = await g.next_done(cancel_remaining=True)
+                await task.join()
+        except CancelledError:
+            pass
+
+    async def _relay(self, rconn, wconn):
+        try:
+            while True:
+                data = await rconn.recv(65536)
+                if not data:
+                    return
+                stats.incr('traffic', len(data))
+                await wconn.sendall(data)
+        except CancelledError:
+            pass
+        except Exception as e:
+            if verbose > 0:
+                print(f'{self} error: {e}')
+            if verbose > 1:
+                traceback.print_exc()
 
 
 async def udp_server(host, port, handler_task, *,
@@ -977,6 +1074,7 @@ server_protos = {
     'ss': SSConnection,
     'http': HTTPConnection,
     'https': HTTPConnection,
+    'oldhttp': OldHTTPConnection,
     'socks': SocksConnection,
     'red': RedirectConnection,
     'ssudp': SSUDPServer,
@@ -1097,20 +1195,36 @@ def ProtoFactory(cls, *args, **kwargs):
     return client_handler
 
 
+def human_bytes(val):
+    if val < 1024:
+        return f'{val:.0f}Bytes'
+    elif val < 1048576:
+        return f'{val/1024:.1f}KB'
+    else:
+        return f'{val/1048576:.1f}MB'
+
+
+def human_speed(speed):
+    if speed < 1024:
+        return f'{speed:.0f} B/s'
+    elif speed < 1048576:
+        return f'{speed/1024:.1f} KB/s'
+    else:
+        return f'{speed/1048576:.1f} MB/s'
+
+
 async def show_stats():
     pid = os.getpid()
     print(f'kill -USR1 {pid} to show connections')
+    stats.incr('traffic', 0)
+    sig = SignalEvent(signal.SIGUSR1)
     while True:
-        async with SignalSet(signal.SIGUSR1) as sig:
-            await sig.wait()
-            for conn in connections:
-                print(f'| {conn} ({conn.stats})')
-            n = len(connections)
-            print('-'*15,
-                  f'{n} connections, {total_stats} '
-                  f'( {total_stats.get_speed()} )',
-                  '-'*15)
-            total_stats.reset()
+        await sig.wait()
+        sig.clear()
+        n = len(connections)
+        data = stats.flush()
+        print(f'{n} connections {human_bytes(data["traffic"])} '
+              f'{human_speed(data["traffic"]/60)}')
 
 
 def main():
@@ -1121,7 +1235,6 @@ def main():
                         help='print verbose output')
     parser.add_argument('--version', action='version',
                         version=f'%(prog)s {__version__}')
-    parser.add_argument('--monitor', dest='monitor', action='store_true')
     parser.add_argument('server', nargs='+', type=get_server)
     args = parser.parse_args()
     global verbose
@@ -1130,7 +1243,7 @@ def main():
         resource.setrlimit(resource.RLIMIT_NOFILE, (50000, 50000))
     except Exception as e:
         print('Require root permission to allocate resources')
-    kernel = curio.Kernel(with_monitor=args.monitor)
+    kernel = curio.Kernel()
     try:
         kernel.run(multi_server(*args.server))
     except Exception as e:

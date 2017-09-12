@@ -17,7 +17,9 @@ with open(os.path.join(BASE_PATH, 'shadowproxy.py')) as f:
 
 setup(
     name='shadowproxy',
-    description='A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.',
+    description='A proxy server that implements '
+                'Socks5/Shadowsocks/Redirect/HTTP (tcp) '
+                'and Shadowsocks/TProxy/Tunnel (udp) protocols.',
     license='MIT',
     version=version,
     author='Yingbo Gu',
@@ -25,11 +27,13 @@ setup(
     maintainer='Yingbo Gu',
     maintainer_email='tensiongyb@gmail.com',
     url='https://github.com/guyingbo/shadowproxy',
-    py_modules = ['shadowproxy'],
+    py_modules=['shadowproxy'],
     install_requires=[
         'pycryptodome>=3.4.3',
-        'curio==0.6',
+        'curio==0.8',
         'pylru>=1.0.9',
+        'httptools>=0.0.9',
+        'microstats>=0.1.0',
     ],
     entry_points={
         'console_scripts': [
