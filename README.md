@@ -1,6 +1,11 @@
 # Shadowproxy
 
 [![Build Status](https://travis-ci.org/guyingbo/shadowproxy.svg?branch=master)](https://travis-ci.org/guyingbo/shadowproxy)
+[![Python Version](https://img.shields.io/pypi/pyversions/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
+[![Version](https://img.shields.io/pypi/v/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
+[![Format](https://img.shields.io/pypi/format/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
+[![License](https://img.shields.io/pypi/l/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
+
 
 ## Intro
 
