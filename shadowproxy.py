@@ -62,7 +62,7 @@ import curio
 import sys
 import re
 import os
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 SO_ORIGINAL_DST = 80
 IP_TRANSPARENT = 19
 IP_ORIGDSTADDR = 20

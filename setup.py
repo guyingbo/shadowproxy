@@ -15,11 +15,17 @@ with open(os.path.join(BASE_PATH, 'shadowproxy.py')) as f:
         raise RuntimeError('Unable to determine version.')
 
 
+with open(os.path.join(BASE_PATH, 'README.md')) as readme:
+    long_description = readme.read()
+
+
 setup(
     name='shadowproxy',
     description='A proxy server that implements '
                 'Socks5/Shadowsocks/Redirect/HTTP (tcp) '
                 'and Shadowsocks/TProxy/Tunnel (udp) protocols.',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     license='MIT',
     version=version,
     author='Yingbo Gu',
@@ -30,7 +36,7 @@ setup(
     py_modules=['shadowproxy'],
     install_requires=[
         'pycryptodome>=3.4.3',
-        'curio==0.8',
+        'curio>=0.8',
         'pylru>=1.0.9',
         'httptools>=0.0.9',
         'microstats>=0.1.0',
