@@ -63,7 +63,7 @@ shadowproxy -v tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888
 
 ## Installation
 
-shadowproxy requires Python3.6.
+shadowproxy requires Python3.6+
 
 ```
 pip install shadowproxy
