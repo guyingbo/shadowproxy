@@ -79,7 +79,7 @@ def get_server(uri, is_via=False):
     if "plugin" in qs:
         plugin_info = qs["plugin"][0]
         plugin_name, _, args = plugin_info.partition(";")
-        args = args.split(",")
+        args = [arg for arg in args.split(",") if arg]
         kwargs["plugin"] = plugins[plugin_name](*args)
     if is_via:
         kwargs["bind_addr"] = bind_addr

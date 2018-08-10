@@ -35,7 +35,7 @@ class SSProxy(ProxyBase):
 
         if via_client:
             async with via_client:
-                redundant = addr_reader.read()
+                redundant = addr_reader.input.read()
                 if redundant:
                     await via_client.sendall(redundant)
                 await self.relay(via_client)
@@ -75,7 +75,10 @@ class SSClient(ClientBase):
         if not data:
             return data
         self.ss_reader.send(data)
-        return self.ss_reader.read()
+        data = self.ss_reader.read()
+        if not data:
+            data = await self.recv(size)
+        return data
 
     async def sendall(self, data):
         data = self.encrypt(data)

@@ -17,6 +17,18 @@ def test_ss():
     assert reader.read() == data
 
 
+def test_ss2():
+    cipher = AES256CFB(secrets.token_urlsafe(20))
+    iv, encrypt = cipher.make_encrypter()
+    reader = SSReader(cipher)
+    reader.send(iv)
+    assert reader.read() == b""
+    assert reader.read() == b""
+    data = os.urandom(20)
+    reader.send(encrypt(data))
+    assert reader.read() == data
+
+
 def test_aead():
     cipher = AES128GCM(secrets.token_urlsafe(20))
     salt, encrypt = cipher.make_encrypter()

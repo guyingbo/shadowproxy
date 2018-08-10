@@ -44,8 +44,8 @@ class AEADProxy(ProxyBase):
             addr_reader.send(data)
             if not addr_reader.has_result:
                 continue
-            self.target_addr, _, redundant = addr_reader.get_result()
-            print(self.target_addr, _, redundant)
+            self.target_addr, _ = addr_reader.get_result()
+            print(self.target_addr, _)
             via_client = await self.connect_server(self.target_addr)
 
         if via_client:

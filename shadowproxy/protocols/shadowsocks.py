@@ -37,9 +37,9 @@ def SSReader(cipher):
     iv = yield from ohneio.read(cipher.IV_SIZE)
     decrypt = cipher.make_decrypter(iv)
     while True:
-        yield from ohneio.wait()
         data = yield from ohneio.read()
         if not data:
+            yield from ohneio.wait()
             continue
         data = decrypt(data)
         yield from ohneio.write(data)

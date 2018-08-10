@@ -30,7 +30,7 @@ class SocksProxy(ProxyBase):
             print(self, cmd)
             if cmd == 1:  # connect
                 via_client = await self.connect_server(self.target_addr)
-                redundant = socks5.read()
+                redundant = socks5.input.read()
                 if redundant:
                     print("redundant:", redundant)
                     await self.client.sendall(redundant)
