@@ -1,0 +1,5 @@
+
+
+
+class HTTPProxy:
+    proot = "HTTP"
