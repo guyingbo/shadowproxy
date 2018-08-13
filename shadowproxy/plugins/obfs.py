@@ -35,3 +35,4 @@ class HttpSimplePlugin:
                     return redundant
 
                 client.recv = tmp_recv
+            return
