@@ -37,6 +37,12 @@ class ProxyBase(abc.ABC):
         return ""
 
     @property
+    def remote_address(self) -> str:
+        if getattr(self, "via", None):
+            return self.via.bind_address
+        return self.target_address
+
+    @property
     def bind_address(self) -> str:
         if self.client is None:
             return ""
@@ -90,27 +96,39 @@ class ProxyBase(abc.ABC):
 
     async def _relay(self, to):
         recv = getattr(self, "recv", self.client.recv)
-        try:
-            while True:
+        while True:
+            try:
                 data = await recv(gvars.PACKET_SIZE)
-                if not data:
-                    break
+            except (ConnectionResetError, BrokenPipeError) as e:
+                if gvars.VERBOSE > 0:
+                    print("recv from", self.client_address, e)
+                raise
+            if not data:
+                break
+            try:
                 await to.sendall(data)
-        except (ConnectionResetError, BrokenPipeError) as e:
-            logger.exception('reset 1')
-            raise
+            except (ConnectionResetError, BrokenPipeError) as e:
+                if gvars.VERBOSE > 0:
+                    print("send to  ", self.remote_address, e)
+                raise
 
     async def _reverse_relay(self, from_):
         sendall = getattr(self, "sendall", self.client.sendall)
-        try:
-            while True:
+        while True:
+            try:
                 data = await from_.recv(gvars.PACKET_SIZE)
-                if not data:
-                    break
+            except (ConnectionResetError, BrokenPipeError) as e:
+                if gvars.VERBOSE > 0:
+                    print("recv from", self.remote_address, e)
+                raise
+            if not data:
+                break
+            try:
                 await sendall(data)
-        except (ConnectionResetError, BrokenPipeError):
-            logger.exception('reset 2')
-            raise
+            except (ConnectionResetError, BrokenPipeError) as e:
+                if gvars.VERBOSE > 0:
+                    print("send to  ", self.client_address, e)
+                raise
 
 
 class ClientBase(abc.ABC):
