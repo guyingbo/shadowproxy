@@ -1,6 +1,17 @@
 from datetime import datetime
 from .. import gvars
 
+request_tmpl = (
+    b"GET / HTTP/1.1\r\n"
+    b"Host: {}\r\n"
+    b"User-Agent: Mozilla/5.0 (compatible; WOW64; MSIE 10.0; Windows NT 6.2)\r\n"
+    b"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+    b"Accept-Language: en-US,en;q=0.8\r\n"
+    b"Accept-Encoding: gzip, deflate\r\n"
+    b"DNT: 1\r\n"
+    b"Connection: keep-alive\r\n\r\n"
+)
+
 
 class HttpSimplePlugin:
     def __init__(self):
@@ -36,7 +47,7 @@ class HttpSimplePlugin:
             recv = client.recv
 
             async def disposable_recv(size):
-                client.rev = recv
+                client.recv = recv
                 return redundant
 
             client.recv = disposable_recv

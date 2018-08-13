@@ -89,8 +89,6 @@ class ProxyBase(abc.ABC):
                 else:
                     await g.spawn(self._reverse_relay(via_client))
                 await g.next_done(cancel_remaining=True)
-        except (ConnectionResetError, BrokenPipeError):
-            logger.exception('reset 0')
         except curio.TaskGroupError:
             print('group error')
 
