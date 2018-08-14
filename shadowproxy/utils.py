@@ -1,13 +1,11 @@
 import curio
 import socket
 # import signal
-import logging
 import ipaddress
 
 # from curio.signal import SignalEvent
 # from microstats import MicroStats
 
-logger = logging.getLogger(__package__)
 local_networks = [
     "0.0.0.0/8",
     "10.0.0.0/8",

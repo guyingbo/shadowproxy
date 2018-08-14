@@ -1,10 +1,7 @@
 import abc
 import curio
-import logging
 from .. import gvars
 from ..utils import open_connection
-
-logger = logging.getLogger(__name__)
 
 
 class ProxyBase(abc.ABC):
@@ -73,7 +70,7 @@ class ProxyBase(abc.ABC):
                     await self.plugin.run(client)
                 await self._run()
         except Exception:
-            logger.exception("proxy error")
+            gvars.logger.exception("proxy error")
 
     async def relay(self, via_client):
         try:
@@ -82,7 +79,7 @@ class ProxyBase(abc.ABC):
                 await g.spawn(self._reverse_relay(via_client))
                 await g.next_done(cancel_remaining=True)
         except curio.TaskGroupError as e:
-            logger.debug(f"group error: {e}")
+            gvars.logger.debug(f"group error: {e}")
 
     async def _relay(self, to):
         recv = getattr(self, "recv", self.client.recv)
@@ -90,14 +87,14 @@ class ProxyBase(abc.ABC):
             try:
                 data = await recv(gvars.PACKET_SIZE)
             except (ConnectionResetError, BrokenPipeError) as e:
-                logger.debug(f"recv from {self.client_address} {e}")
+                gvars.logger.debug(f"recv from {self.client_address} {e}")
                 return
             if not data:
                 break
             try:
                 await to.sendall(data)
             except (ConnectionResetError, BrokenPipeError) as e:
-                logger.debug(f"send to {self.remote_address} {e}")
+                gvars.logger.debug(f"send to {self.remote_address} {e}")
                 return
 
     async def _reverse_relay(self, from_):
@@ -106,14 +103,14 @@ class ProxyBase(abc.ABC):
             try:
                 data = await from_.recv(gvars.PACKET_SIZE)
             except (ConnectionResetError, BrokenPipeError) as e:
-                logger.debug(f"recv from {self.remote_address} {e}")
+                gvars.logger.debug(f"recv from {self.remote_address} {e}")
                 return
             if not data:
                 break
             try:
                 await sendall(data)
             except (ConnectionResetError, BrokenPipeError) as e:
-                logger.debug(f"send to {self.client_address} {e}")
+                gvars.logger.debug(f"send to {self.client_address} {e}")
                 return
 
 

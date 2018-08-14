@@ -108,7 +108,7 @@ async def multi_server(*servers):
         address = ", ".join(f"{scheme}://{host}:{port}" for host, port, scheme in addrs)
         ss_filter = " or ".join(f"dport = {port}" for host, port, scheme in addrs)
         pid = os.getpid()
-        gvars.logger.info(f"{__name__}/{__version__} listen on {address} pid: {pid}")
+        gvars.logger.info(f"{__package__}/{__version__} listen on {address} pid: {pid}")
         gvars.logger.debug(f"sudo lsof -p {pid} -P | grep -e TCP -e STREAM")
         gvars.logger.debug(f'ss -o "( {ss_filter} )"')
 
