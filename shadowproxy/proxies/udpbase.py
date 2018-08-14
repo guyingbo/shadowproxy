@@ -58,5 +58,3 @@ class UDPClient:
     async def close(self):
         await self._relay_task.cancel()
         await self.sock.close()
-
-

@@ -2,6 +2,7 @@ import curio
 import socket
 # import signal
 import ipaddress
+from . import gvars
 
 # from curio.signal import SignalEvent
 # from microstats import MicroStats
@@ -99,6 +100,6 @@ async def open_connection(host, port, **kwargs):
         try:
             return await curio.open_connection(host, port, **kwargs)
         except socket.gaierror:
-            logger.debug("dns query failed: {host}")
             if i == 0:
+                gvars.logger.debug(f"dns query failed: {host}")
                 raise

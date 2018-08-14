@@ -69,8 +69,8 @@ class ProxyBase(abc.ABC):
                 if self.plugin:
                     await self.plugin.run(client)
                 await self._run()
-        except Exception:
-            gvars.logger.exception("proxy error")
+        except Exception as e:
+            gvars.logger.error(e)
 
     async def relay(self, via_client):
         try:
