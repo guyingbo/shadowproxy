@@ -1,9 +1,13 @@
+import curio
 import socket
 # import signal
+import logging
 import ipaddress
+
 # from curio.signal import SignalEvent
 # from microstats import MicroStats
 
+logger = logging.getLogger(__package__)
 local_networks = [
     "0.0.0.0/8",
     "10.0.0.0/8",
@@ -90,3 +94,13 @@ def human_speed(speed: int) -> str:
 #             f'{n} connections {human_bytes(data["traffic"])} '
 #             f'{human_speed(data["traffic"]/60)}'
 #         )
+
+
+async def open_connection(host, port, **kwargs):
+    for i in range(2, -1, -1):
+        try:
+            return await curio.open_connection(host, port, **kwargs)
+        except socket.gaierror:
+            logger.debug("dns query failed: {host}")
+            if i == 0:
+                raise

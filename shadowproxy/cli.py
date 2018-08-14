@@ -4,6 +4,7 @@ import types
 import curio
 import base64
 import weakref
+import logging
 import argparse
 import resource
 import traceback
@@ -49,7 +50,8 @@ def get_server(uri, is_via=False):
     proto = via_protos[url.scheme] if is_via else server_protos[url.scheme]
     userinfo, _, loc = url.netloc.rpartition("@")
     if userinfo:
-        userinfo = base64.b64decode(userinfo).decode("ascii")
+        if ":" not in userinfo:
+            userinfo = base64.b64decode(userinfo).decode("ascii")
         cipher_name, _, password = userinfo.partition(":")
         if url.scheme.startswith("ss"):
             kwargs["cipher"] = ciphers[cipher_name](password)
@@ -104,12 +106,11 @@ async def multi_server(*servers):
 
         # await g.spawn(show_stats())
         address = ", ".join(f"{scheme}://{host}:{port}" for host, port, scheme in addrs)
-        ss_filter = "or ".join(f"dport = {port}" for host, port, scheme in addrs)
+        ss_filter = " or ".join(f"dport = {port}" for host, port, scheme in addrs)
         pid = os.getpid()
-        if gvars.VERBOSE > 0:
-            print(f"{__name__}/{__version__} listen on {address} pid: {pid}")
-            print(f"sudo lsof -p {pid} -P | grep -e TCP -e STREAM")
-            print(f'ss -o "( {ss_filter} )"')
+        gvars.logger.info(f"{__name__}/{__version__} listen on {address} pid: {pid}")
+        gvars.logger.debug(f"sudo lsof -p {pid} -P | grep -e TCP -e STREAM")
+        gvars.logger.debug(f'ss -o "( {ss_filter} )"')
 
 
 def main():
@@ -124,21 +125,26 @@ def main():
     )
     parser.add_argument("server", nargs="+", type=get_server)
     args = parser.parse_args()
-    gvars.VERBOSE = args.verbose
+    if args.verbose == 0:
+        level = logging.ERROR
+    elif args.verbose == 1:
+        level = logging.INFO
+    else:
+        level = logging.DEBUG
+    gvars.logger.setLevel(level)
     try:
         resource.setrlimit(resource.RLIMIT_NOFILE, (50000, 50000))
     except Exception as e:
-        print("Require root permission to allocate resources")
+        gvars.logger.warning("Require root permission to allocate resources")
     kernel = curio.Kernel()
     try:
         kernel.run(multi_server(*args.server))
     except Exception as e:
         traceback.print_exc()
         for conn in connections:
-            print("|", conn, file=sys.stderr)
+            gvars.logger.debug(f"| {conn}")
     except KeyboardInterrupt:
         kernel.run(shutdown=True)
-        print()
 
 
 if __name__ == "__main__":

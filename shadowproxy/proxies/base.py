@@ -1,8 +1,8 @@
 import abc
 import curio
-from curio import socket
 import logging
 from .. import gvars
+from ..utils import open_connection
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class ProxyBase(abc.ABC):
         return f"{addr[0]}:{addr[1]}"
 
     def __repr__(self):
-        via_address = f' -- {self.via_address}' if self.via_address else ''
+        via_address = f" -- {self.via_address}" if self.via_address else ""
         return (
             f"{self.client_address} -- {self.proto} -- {self.bind_address}"
             f"{via_address} -- {self.target_address}"
@@ -62,12 +62,7 @@ class ProxyBase(abc.ABC):
             await via_client.connect(target_addr)
             return via_client
         else:
-            for i in range(2, -1, -1):
-                try:
-                    return await curio.open_connection(*target_addr)
-                except socket.gaierror:
-                    if i == 0:
-                        raise
+            return await open_connection(*target_addr)
 
     async def __call__(self, client, addr):
         self.client = client
@@ -78,19 +73,16 @@ class ProxyBase(abc.ABC):
                     await self.plugin.run(client)
                 await self._run()
         except Exception:
-            logger.exception('proxy error')
+            logger.exception("proxy error")
 
     async def relay(self, via_client):
         try:
             async with curio.TaskGroup() as g:
                 await g.spawn(self._relay(via_client))
-                if hasattr(via_client, "relay"):
-                    await g.spawn(via_client.relay(self.client))
-                else:
-                    await g.spawn(self._reverse_relay(via_client))
+                await g.spawn(self._reverse_relay(via_client))
                 await g.next_done(cancel_remaining=True)
-        except curio.TaskGroupError:
-            print('group error')
+        except curio.TaskGroupError as e:
+            logger.debug(f"group error: {e}")
 
     async def _relay(self, to):
         recv = getattr(self, "recv", self.client.recv)
@@ -98,17 +90,15 @@ class ProxyBase(abc.ABC):
             try:
                 data = await recv(gvars.PACKET_SIZE)
             except (ConnectionResetError, BrokenPipeError) as e:
-                if gvars.VERBOSE > 0:
-                    print("recv from", self.client_address, e)
-                raise
+                logger.debug(f"recv from {self.client_address} {e}")
+                return
             if not data:
                 break
             try:
                 await to.sendall(data)
             except (ConnectionResetError, BrokenPipeError) as e:
-                if gvars.VERBOSE > 0:
-                    print("send to  ", self.remote_address, e)
-                raise
+                logger.debug(f"send to {self.remote_address} {e}")
+                return
 
     async def _reverse_relay(self, from_):
         sendall = getattr(self, "sendall", self.client.sendall)
@@ -116,17 +106,15 @@ class ProxyBase(abc.ABC):
             try:
                 data = await from_.recv(gvars.PACKET_SIZE)
             except (ConnectionResetError, BrokenPipeError) as e:
-                if gvars.VERBOSE > 0:
-                    print("recv from", self.remote_address, e)
-                raise
+                logger.debug(f"recv from {self.remote_address} {e}")
+                return
             if not data:
                 break
             try:
                 await sendall(data)
             except (ConnectionResetError, BrokenPipeError) as e:
-                if gvars.VERBOSE > 0:
-                    print("send to  ", self.client_address, e)
-                raise
+                logger.debug(f"send to {self.client_address} {e}")
+                return
 
 
 class ClientBase(abc.ABC):
@@ -146,12 +134,16 @@ class ClientBase(abc.ABC):
         if self.sock:
             await self.sock.__aexit__(et, e, tb)
 
+    @property
+    def target_address(self) -> str:
+        return f"{self.target_addr[0]}:{self.target_addr[1]}"
+
     @abc.abstractmethod
     async def connect(self, target_addr):
         pass
 
     @abc.abstractmethod
-    async def relay(self, to):
+    async def recv(self, size):
         pass
 
     @abc.abstractmethod

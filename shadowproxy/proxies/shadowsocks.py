@@ -1,7 +1,5 @@
-import curio
 from .. import gvars
-from curio import socket
-from ..utils import pack_addr
+from ..utils import pack_addr, open_connection
 from .base import ProxyBase, ClientBase
 from ..protocols.shadowsocks import AddrReader, SSReader
 
@@ -30,7 +28,7 @@ class SSProxy(ProxyBase):
                 continue
             self.target_addr, _ = addr_reader.get_result()
             via_client = await self.connect_server(self.target_addr)
-            print(self)
+            gvars.logger.info(self)
             break
 
         if via_client:
@@ -60,12 +58,7 @@ class SSClient(ClientBase):
 
     async def connect(self, target_addr):
         self.target_addr = target_addr
-        for i in range(2, -1, -1):
-            try:
-                self.sock = await curio.open_connection(*self.ns.bind_addr)
-            except socket.gaierror:
-                if i == 0:
-                    raise
+        self.sock = await open_connection(*self.ns.bind_addr)
         iv, self.encrypt = self.ns.cipher.make_encrypter()
         data = iv + self.encrypt(pack_addr(target_addr))
         await self.sock.sendall(data)
@@ -83,10 +76,3 @@ class SSClient(ClientBase):
     async def sendall(self, data):
         data = self.encrypt(data)
         await self.sock.sendall(data)
-
-    async def relay(self, to):
-        while True:
-            data = await self.recv(gvars.PACKET_SIZE)
-            if not data:
-                break
-            await to.sendall(data)

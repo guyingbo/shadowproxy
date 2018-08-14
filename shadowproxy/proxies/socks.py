@@ -27,14 +27,13 @@ class SocksProxy(ProxyBase):
             if not socks5.has_result:
                 continue
             self.target_addr, cmd = socks5.get_result()
-            print(self, cmd)
             if cmd == 1:  # connect
                 via_client = await self.connect_server(self.target_addr)
                 redundant = socks5.input.read()
                 if redundant:
-                    print("redundant:", redundant)
                     await self.client.sendall(redundant)
                 await self.client.sendall(self._make_resp())
+            gvars.logger.info(self)
             break
 
         if via_client:

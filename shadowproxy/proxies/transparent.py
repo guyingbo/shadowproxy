@@ -1,5 +1,6 @@
 import struct
 import logging
+from .. import gvars
 from curio import socket
 from .base import ProxyBase
 
@@ -23,6 +24,7 @@ class TransparentProxy(ProxyBase):
             logger.exception(f"{self} isn't a redirect proxy")
 
         via_client = await self.connect_server(self.target_addr)
+        gvars.logger.info(self)
         async with via_client:
             await self.relay(via_client)
 
