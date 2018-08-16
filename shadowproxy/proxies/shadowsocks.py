@@ -17,8 +17,12 @@ class SSProxy(ProxyBase):
         addr_reader = AddrReader()
 
         via_client = None
+        if hasattr(self.plugin, "make_recv_func"):
+            self._recv = self.plugin.make_recv_func(self.client)
+        else:
+            self._recv = self.client.recv
         while True:
-            data = await self.client.recv(gvars.PACKET_SIZE)
+            data = await self._recv(gvars.PACKET_SIZE)
             if not data:
                 break
             self.ss_reader.send(data)
@@ -39,17 +43,20 @@ class SSProxy(ProxyBase):
                 await self.relay(via_client)
 
     async def recv(self, size):
-        data = await self.client.recv(size)
+        data = await self._recv(size)
         if not data:
             return data
         self.ss_reader.send(data)
         return self.ss_reader.read()
 
     async def sendall(self, data):
+        iv = b""
         if not hasattr(self, "encrypt"):
             iv, self.encrypt = self.cipher.make_encrypter()
-            await self.client.sendall(iv)
-        await self.client.sendall(self.encrypt(data))
+        to_send = iv + self.encrypt(data)
+        if hasattr(self.plugin, "encode"):
+            to_send = self.plugin.encode(to_send)
+        await self.client.sendall(to_send)
 
 
 class SSClient(ClientBase):

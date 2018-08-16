@@ -14,10 +14,9 @@ request_tmpl = (
 
 
 class HttpSimplePlugin:
-    def __init__(self):
-        pass
+    name = "http_simple"
 
-    async def run(self, client):
+    async def init_server(self, client):
         buf = bytearray()
         start = 0
         while True:

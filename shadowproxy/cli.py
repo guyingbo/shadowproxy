@@ -1,5 +1,4 @@
 import os
-import sys
 import types
 import curio
 import base64

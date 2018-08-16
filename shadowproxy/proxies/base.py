@@ -67,10 +67,14 @@ class ProxyBase(abc.ABC):
         try:
             async with client:
                 if self.plugin:
-                    await self.plugin.run(client)
+                    self.plugin.proxy = self
+                    self.proto += f"({self.plugin.name})"
+                    await self.plugin.init_server(client)
                 await self._run()
+        except curio.errors.TaskCancelled:
+            pass
         except Exception as e:
-            gvars.logger.error(e)
+            gvars.logger.exception(f"error: {e}")
 
     async def relay(self, via_client):
         try:
