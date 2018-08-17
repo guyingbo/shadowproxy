@@ -1,52 +1,29 @@
 import base64
-from urllib import parse
 from ... import gvars, __version__
-from ...utils import open_connection
-from ..base import ClientBase
+from ..base.client import ClientBase
 
 
 class HTTPOnlyClient(ClientBase):
-    async def connect(self, target_addr, method, path, headers):
-        self.target_addr = target_addr
-        self.sock = await open_connection(*self.ns.bind_addr)
-        headers = [header.encode() for header in headers]
+    async def init(self):
+        pass
+
+    async def http_request(
+        self, uri: str, method: str = "GET", headers: list = None, response_cls=None
+    ):
+        if uri.startswith("https"):
+            uri = "http" + uri[5:]
+        headers = headers or []
         headers.append(b"Proxy-Connection: Keep-Alive")
         if self.ns.auth:
             headers.append(
                 b"Proxy-Authorization: Basic %s"
                 % base64.b64encode(b":".join(self.ns.auth))
             )
-        url = parse.urlparse(path.encode())
-        newpath = url._replace(
-            scheme=b"http", netloc=self.target_address.encode()
-        ).geturl()
-        ver = b"HTTP/1.1"
-        method = method.upper().encode()
-        data = b"%b %b %b\r\n%b\r\n\r\n" % (method, newpath, ver, b"\r\n".join(headers))
-        await self.sendall(data)
-
-    async def sendall(self, data):
-        return await self.sock.sendall(data)
-
-    async def recv(self, size):
-        return await self.sock.recv(size)
+        return await super().http_request(uri, method, headers, response_cls)
 
 
 class HTTPClient(ClientBase):
-    redundant = None
-
-    async def connect(self, target_addr):
-        self.target_addr = target_addr
-        self.sock = await open_connection(*self.ns.bind_addr)
-        if target_addr[1] != 443:
-            await self.init_https()
-        else:
-            await self.init_https()
-
-    async def http(self):
-        pass
-
-    async def init_https(self):
+    async def init(self):
         headers_str = (
             f"CONNECT {self.target_address} HTTP/1.1\r\n"
             f"Host: {self.target_address}\r\n"
@@ -75,17 +52,15 @@ class HTTPClient(ClientBase):
             break
         buf_mem = memoryview(buf)
         header_lines = buf_mem[:index].tobytes()
-        self.redundant = buf_mem[index + 4 :].tobytes()
         if not header_lines.startswith(b"HTTP/1.1 200"):
             gvars.logger.debug(f"{self} got {data}")
             raise Exception(data)
+        redundant = buf_mem[index + 4 :].tobytes()
+        if redundant:
+            recv = self.sock.recv
 
-    async def sendall(self, data):
-        return await self.sock.sendall(data)
+            async def disposable_recv(size):
+                self.sock.recv = recv
+                return redundant
 
-    async def recv(self, size):
-        if self.redundant:
-            redundant = self.redundant
-            self.redundant = b""
-            return redundant
-        return await self.sock.recv(size)
+            self.sock.recv = disposable_recv

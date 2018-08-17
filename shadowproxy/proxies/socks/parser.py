@@ -23,7 +23,7 @@ def read_addr():
 
 
 @ohneio.protocol
-def Socks5Reader(auth=False):
+def Socks5RequestParser(auth=False):
     ver, nmethods = struct.unpack("!BB", (yield from ohneio.read(2)))
     assert ver == 5, f"bad socks version: {ver}"
     assert nmethods != 0, f"nmethods can't be 0"
@@ -32,7 +32,7 @@ def Socks5Reader(auth=False):
         yield from ohneio.write(b"\x05\xff")
         raise Exception("server needs auth")
     elif b"\x00" not in methods:
-        yield from ohneio.write(b"\x05\x02")
+        yield from ohneio.write(b"\x05\x00")
         raise Exception("method not support")
     if auth:
         yield from ohneio.write(b"\x05\x02")
@@ -59,3 +59,16 @@ def Socks5Reader(auth=False):
         raise Exception(f"unknown cmd: {cmd}")
     target_addr = yield from read_addr()
     return target_addr, cmd
+
+
+@ohneio.protocol
+def Socks5ResponseParser():
+    data = yield from ohneio.read(2)
+    assert data[0] == 5, f"bad socks version: {data[0]}"
+    method = data[1]
+    assert method in (0, 2), f"bad method {data[1]}"
+    data = yield from ohneio.read(3)
+    assert data[0] == 5, f"bad socks version: {data[0]}"
+    assert data[1] == 0, f"failed REP with code: {data[1]}"
+    bind_addr = yield from read_addr()
+    return bind_addr

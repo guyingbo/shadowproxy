@@ -1,6 +1,6 @@
-from .. import gvars
-from .base import ProxyBase
-from ..protocols.shadowsocks import AEADReader, AddrReader
+from ... import gvars
+from ..base.server import ProxyBase
+from ...protocols.shadowsocks import AEADReader, AddrReader
 
 
 class AEADProxy(ProxyBase):

@@ -2,7 +2,7 @@ import re
 import base64
 from urllib import parse
 from ... import gvars
-from ..base import ProxyBase
+from ..base.server import ProxyBase
 
 HTTP_LINE = re.compile(b"([^ ]+) +(.+?) +(HTTP/[^ ]+)")
 

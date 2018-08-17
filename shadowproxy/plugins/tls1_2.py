@@ -1,6 +1,6 @@
 import random
 from .. import gvars
-from ..protocols.tls1_2 import TLS1_2Reader, Receiver
+from ..protocols.tls1_2 import TLS1_2RequestParser, Receiver
 
 
 def pack_uint16(s):
@@ -16,24 +16,24 @@ class TLS1_2Plugin:
         self.time_tolerance = 5 * 60
 
     async def init_server(self, client):
-        tls_reader = TLS1_2Reader(self)
+        tls_parser = TLS1_2RequestParser(self)
         hello_sent = False
         while True:
             data = await client.recv(gvars.PACKET_SIZE)
             if not data:
                 return
-            tls_reader.send(data)
+            tls_parser.send(data)
             if not hello_sent:
-                server_hello = tls_reader.read()
+                server_hello = tls_parser.read()
                 if not server_hello:
                     continue
                 await client.sendall(server_hello)
                 hello_sent = True
             else:
-                if not tls_reader.has_result:
+                if not tls_parser.has_result:
                     continue
                 break
-        redundant = tls_reader.input.read()
+        redundant = tls_parser.input.read()
         # if redundant:
         recv = client.recv
 

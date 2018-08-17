@@ -1,7 +1,7 @@
 import struct
 from .. import gvars
 from curio import socket
-from .base import ProxyBase
+from .base.server import ProxyBase
 
 SO_ORIGINAL_DST = 80
 

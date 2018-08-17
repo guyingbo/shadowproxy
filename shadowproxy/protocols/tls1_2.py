@@ -21,7 +21,7 @@ def sni(host):
 
 
 @ohneio.protocol
-def TLS1_2Reader(plugin):
+def TLS1_2RequestParser(plugin):
     tls_version = plugin.tls_version
     tls_plaintext_head = memoryview((yield from ohneio.read(5)))
     assert (

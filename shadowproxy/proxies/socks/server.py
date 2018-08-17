@@ -1,7 +1,7 @@
-from .. import gvars
-from ..utils import pack_addr
-from .base import ProxyBase
-from ..protocols.socks import Socks5Reader
+from ... import gvars
+from ...utils import pack_addr
+from ..base.server import ProxyBase
+from .parser import Socks5RequestParser
 
 
 class SocksProxy(ProxyBase):
@@ -13,7 +13,7 @@ class SocksProxy(ProxyBase):
         self.plugin = plugin
 
     async def _run(self):
-        socks5 = Socks5Reader(self.auth)
+        socks5 = Socks5RequestParser(self.auth)
 
         via_client = None
         while True:
