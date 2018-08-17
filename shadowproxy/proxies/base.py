@@ -120,11 +120,15 @@ class ProxyBase(abc.ABC):
 
 class ClientBase(abc.ABC):
     sock = None
+    target_addr = ("unknown", -1)
 
     def __init__(self, namespace):
         self.ns = namespace
         if hasattr(self, "_init"):
             self._init()
+
+    def __repr__(self):
+        return f"{self.bind_address} -- {self.target_address}"
 
     async def __aenter__(self):
         if self.sock:
@@ -134,6 +138,10 @@ class ClientBase(abc.ABC):
     async def __aexit__(self, et, e, tb):
         if self.sock:
             await self.sock.__aexit__(et, e, tb)
+
+    @property
+    def bind_address(self) -> str:
+        return f"{self.ns.bind_addr[0]}:{self.ns.bind_addr[1]}"
 
     @property
     def target_address(self) -> str:
@@ -150,3 +158,7 @@ class ClientBase(abc.ABC):
     @abc.abstractmethod
     async def sendall(self, data):
         pass
+
+    async def close(self):
+        if self.sock:
+            await self.sock.close()
