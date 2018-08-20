@@ -6,17 +6,6 @@ from ...utils import pack_addr
 from .parser import Socks5ResponseParser, Socks4ResponseParser
 
 
-def pack_ipv4(addr, userid: bytes = b"\x01\x01") -> bytes:
-    host, port = addr
-    tail = b""
-    try:
-        packed = socket.inet_aton(host)
-    except OSError:
-        packed = b"\x00\x00\x00\x01"
-        tail = host.encode() + b"\x00"
-    return port.to_bytes(2, "big") + packed + userid + b"\x00" + tail
-
-
 class SocksClient(ClientBase):
     name = "socks"
 
@@ -33,7 +22,7 @@ class SocksClient(ClientBase):
         while True:
             data = await self.sock.recv(gvars.PACKET_SIZE)
             if not data:
-                break
+                raise Exception("socks5 handshake failed")
             response_parser.send(data)
             if response_parser.has_result:
                 break
@@ -52,10 +41,7 @@ class Socks4Client(ClientBase):
     async def init(self):
         response_parser = Socks4ResponseParser()
         info = await socket.getaddrinfo(
-            *self.target_addr,
-            socket.AF_INET,
-            socket.SOCK_STREAM,
-            socket.IPPROTO_TCP
+            *self.target_addr, socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP
         )
         addr = random.choice(info)[-1]
         handshake = b"\x04\x01" + pack_ipv4(addr)
@@ -76,3 +62,14 @@ class Socks4Client(ClientBase):
                 return redundant
 
             self.sock.recv = disposable_recv
+
+
+def pack_ipv4(addr, userid: bytes = b"\x01\x01") -> bytes:
+    host, port = addr
+    tail = b""
+    try:
+        packed = socket.inet_aton(host)
+    except OSError:
+        packed = b"\x00\x00\x00\x01"
+        tail = host.encode() + b"\x00"
+    return port.to_bytes(2, "big") + packed + userid + b"\x00" + tail

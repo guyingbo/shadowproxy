@@ -1,7 +1,8 @@
 import os
 import secrets
 from shadowproxy.ciphers import AES128GCM, AES256CFB
-from shadowproxy.protocols.shadowsocks import AEADReader, AddrReader, SSReader
+from shadowproxy.proxies.shadowsocks.parser import AddrParser, SSParser
+from shadowproxy.proxies.aead.parser import AEADParser
 from shadowproxy.utils import pack_addr
 
 
@@ -9,7 +10,7 @@ def test_ss():
     cipher = AES256CFB(secrets.token_urlsafe(20))
     iv, encrypt = cipher.make_encrypter()
     length = len(iv) // 2
-    reader = SSReader(cipher)
+    reader = SSParser(cipher)
     reader.send(iv[:length])
     assert reader.read() == b""
     data = os.urandom(20)
@@ -20,7 +21,7 @@ def test_ss():
 def test_ss2():
     cipher = AES256CFB(secrets.token_urlsafe(20))
     iv, encrypt = cipher.make_encrypter()
-    reader = SSReader(cipher)
+    reader = SSParser(cipher)
     reader.send(iv)
     assert reader.read() == b""
     assert reader.read() == b""
@@ -33,7 +34,7 @@ def test_aead():
     cipher = AES128GCM(secrets.token_urlsafe(20))
     salt, encrypt = cipher.make_encrypter()
     length = len(salt) // 2
-    aead = AEADReader(cipher).new()
+    aead = AEADParser(cipher).new()
     aead.send(salt[:length])
     assert aead.read() == b""
     data = os.urandom(20)
@@ -51,7 +52,7 @@ def test_addr_reader():
     )
     for addr in addrs:
         addr_bytes = pack_addr(addr)
-        addr_reader = AddrReader()
+        addr_reader = AddrParser()
         length = len(addr_bytes) // 2
         addr_reader.send(addr_bytes[:length])
         assert not addr_reader.has_result

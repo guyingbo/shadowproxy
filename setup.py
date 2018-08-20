@@ -39,8 +39,9 @@ setup(
         "pycryptodome>=3.4.3",
         "curio>=0.9",
         "pylru>=1.0.9",
-        "microstats>=0.1.0",
+        # "microstats>=0.1.0",
         "ohneio",
+        "httptools",
     ],
     entry_points={"console_scripts": ["shadowproxy = shadowproxy.cli:main"]},
     classifiers=[

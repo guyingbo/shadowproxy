@@ -1,6 +1,6 @@
 from ... import gvars
 from ..base.server import ProxyBase
-from ...protocols.shadowsocks import AddrReader, SSReader
+from .parser import AddrParser, SSParser
 
 
 class SSProxy(ProxyBase):
@@ -10,10 +10,10 @@ class SSProxy(ProxyBase):
         self.cipher = cipher
         self.via = via
         self.plugin = plugin
-        self.ss_reader = SSReader(self.cipher)
+        self.ss_parser = SSParser(self.cipher)
 
     async def _run(self):
-        addr_reader = AddrReader()
+        addr_parser = AddrParser()
 
         via_client = None
         if hasattr(self.plugin, "make_recv_func"):
@@ -24,19 +24,19 @@ class SSProxy(ProxyBase):
             data = await self._recv(gvars.PACKET_SIZE)
             if not data:
                 break
-            self.ss_reader.send(data)
-            data = self.ss_reader.read()
-            addr_reader.send(data)
-            if not addr_reader.has_result:
+            self.ss_parser.send(data)
+            data = self.ss_parser.read()
+            addr_parser.send(data)
+            if not addr_parser.has_result:
                 continue
-            self.target_addr, _ = addr_reader.get_result()
+            self.target_addr, _ = addr_parser.get_result()
             via_client = await self.connect_server(self.target_addr)
             gvars.logger.info(self)
             break
 
         if via_client:
             async with via_client:
-                redundant = addr_reader.input.read()
+                redundant = addr_parser.input.read()
                 if redundant:
                     await via_client.sendall(redundant)
                 await self.relay(via_client)
@@ -45,8 +45,8 @@ class SSProxy(ProxyBase):
         data = await self._recv(size)
         if not data:
             return data
-        self.ss_reader.send(data)
-        return self.ss_reader.read()
+        self.ss_parser.send(data)
+        return self.ss_parser.read()
 
     async def sendall(self, data):
         iv = b""

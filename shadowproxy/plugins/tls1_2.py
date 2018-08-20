@@ -1,6 +1,6 @@
 import random
 from .. import gvars
-from ..protocols.tls1_2 import TLS1_2RequestParser, Receiver
+from .tls_parser import TLS1_2RequestParser, Receiver
 
 
 def pack_uint16(s):

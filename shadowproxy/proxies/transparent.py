@@ -27,5 +27,5 @@ class TransparentProxy(ProxyBase):
             await self.relay(via_client)
 
 
-class TProxyUDPProxy:
+class UDPTransparentProxy:
     proto = "RED(UDP)"
