@@ -1,13 +1,15 @@
 import random
 from .. import gvars
+from .base import Plugin
 from .tls_parser import TLS1_2RequestParser, Receiver
+from ..utils import set_disposable_recv
 
 
 def pack_uint16(s):
     return len(s).to_bytes(2, "big") + s
 
 
-class TLS1_2Plugin:
+class TLS1_2Plugin(Plugin):
     name = "tls1.2"
 
     def __init__(self):
@@ -34,15 +36,7 @@ class TLS1_2Plugin:
                     continue
                 break
         redundant = tls_parser.input.read()
-        # if redundant:
-        recv = client.recv
-
-        async def disposable_recv(size):
-            client.redundant = redundant
-            client.recv = recv
-            return redundant
-
-        client.recv = disposable_recv
+        set_disposable_recv(client, redundant)
 
     def make_recv_func(self, client):
         receiver = Receiver(self)
@@ -69,3 +63,6 @@ class TLS1_2Plugin:
         if len(data) > 0:
             ret += b"\x17" + self.tls_version + pack_uint16(data)
         return ret
+
+    async def init_client(self, client):
+        ""

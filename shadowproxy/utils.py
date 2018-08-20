@@ -103,3 +103,14 @@ async def open_connection(host, port, **kwargs):
             if i == 0:
                 gvars.logger.debug(f"dns query failed: {host}")
                 raise
+
+
+def set_disposable_recv(sock, redundant):
+    if redundant:
+        recv = sock.recv
+
+        async def disposable_recv(size):
+            sock.recv = recv
+            return redundant
+
+        sock.recv = disposable_recv

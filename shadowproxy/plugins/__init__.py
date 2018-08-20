@@ -1,4 +1,4 @@
-from .obfs import HttpSimplePlugin
+from .http_simple import HttpSimplePlugin
 from .tls1_2 import TLS1_2Plugin
 
 

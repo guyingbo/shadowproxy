@@ -46,3 +46,14 @@ def test_ss():
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
     client = get_server(f"ss://aes-256-cfb:123456@{bind_address}", is_via=True).new()
     curio.run(main(server, client))
+
+
+def test_ss_http_simple():
+    server, bind_addr, _ = get_server(
+        "ss://chacha20:123456@127.0.0.1:0/?plugin=http_simple"
+    )
+    bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    client = get_server(
+        f"ss://chacha20:123456@{bind_address}/?plugin=http_simple", is_via=True
+    ).new()
+    curio.run(main(server, client))

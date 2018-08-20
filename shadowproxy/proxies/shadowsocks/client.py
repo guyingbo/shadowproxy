@@ -8,6 +8,9 @@ class SSClient(ClientBase):
         self.ss_parser = SSParser(self.ns.cipher)
 
     async def init(self):
+        plugin = getattr(self.ns, "plugin", None)
+        if plugin:
+            await plugin.init_client(self)
         iv, self.encrypt = self.ns.cipher.make_encrypter()
         data = iv + self.encrypt(pack_addr(self.target_addr))
         await self.sock.sendall(data)
