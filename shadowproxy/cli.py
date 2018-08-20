@@ -8,6 +8,8 @@ import argparse
 import resource
 import traceback
 from curio import ssl
+from curio import socket
+from curio.network import run_server
 from urllib import parse
 from . import gvars
 from .ciphers import ciphers
@@ -56,8 +58,6 @@ def get_server(uri, is_via=False):
             kwargs["cipher"] = ciphers[cipher_name](password)
         elif url.scheme in ("http", "https", "socks"):
             kwargs["auth"] = (cipher_name.encode(), password.encode())
-        else:
-            pass
     elif url.scheme in ("ss", "ssudp"):
         raise argparse.ArgumentTypeError(
             f"you need to assign cryto algorithm and password: {uri}"
@@ -88,10 +88,14 @@ def get_server(uri, is_via=False):
     elif "via" in qs:
         kwargs["via"] = get_server(qs["via"][0], True)
     if url.scheme.endswith("udp"):
-        server = curio.udp_server(*bind_addr, proto(**kwargs))
+        server_sock = udp_server_socket(*bind_addr)
+        bind_addr = server_sock._socket.getsockname()
+        server = run_udp_server(server_sock, proto(**kwargs))
     else:
-        server = curio.tcp_server(
-            *bind_addr, TcpProtoFactory(proto, **kwargs), backlog=1024, ssl=ssl_context
+        server_sock = curio.tcp_server_socket(*bind_addr, backlog=1024)
+        bind_addr = server_sock._socket.getsockname()
+        server = run_server(
+            server_sock, TcpProtoFactory(proto, **kwargs), ssl=ssl_context
         )
     return server, bind_addr, url.scheme
 
@@ -110,6 +114,25 @@ async def multi_server(*servers):
         gvars.logger.info(f"{__package__}/{__version__} listen on {address} pid: {pid}")
         gvars.logger.debug(f"sudo lsof -p {pid} -P | grep -e TCP -e STREAM")
         gvars.logger.debug(f'ss -o "( {ss_filter} )"')
+
+
+async def udp_server_socket(
+    host, port, *, family=socket.AF_INET, reuse_address=True
+):
+    sock = socket.socket(family, socket.SOCK_DGRAM)
+    try:
+        sock.bind((host, port))
+        if reuse_address:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+        return sock
+    except Exception:
+        await sock.close()
+        raise
+
+
+async def run_udp_server(sock, handler_task):
+    async with sock:
+        await handler_task(sock)
 
 
 def main():

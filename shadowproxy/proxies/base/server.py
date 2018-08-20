@@ -13,11 +13,11 @@ class ProxyBase(abc.ABC):
     @property
     @abc.abstractmethod
     def proto(self):
-        pass
+        ""
 
     @abc.abstractmethod
     async def _run(self):
-        pass
+        ""
 
     @property
     def target_address(self) -> str:
@@ -58,9 +58,10 @@ class ProxyBase(abc.ABC):
             via_client = self.via.new()
             await via_client.connect(target_addr)
             await via_client.init()
-            return via_client
         else:
-            return await open_connection(*target_addr)
+            via_client = await open_connection(*target_addr)
+        gvars.logger.info(self)
+        return via_client
 
     async def __call__(self, client, addr):
         self.client = client

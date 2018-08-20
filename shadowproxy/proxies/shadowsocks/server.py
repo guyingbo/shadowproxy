@@ -31,7 +31,6 @@ class SSProxy(ProxyBase):
                 continue
             self.target_addr, _ = addr_parser.get_result()
             via_client = await self.connect_server(self.target_addr)
-            gvars.logger.info(self)
             break
 
         if via_client:

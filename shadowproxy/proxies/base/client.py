@@ -68,7 +68,7 @@ class ClientBase(abc.ABC):
 
     @abc.abstractmethod
     async def init(self):
-        pass
+        ""
 
     async def recv(self, size):
         return await self.sock.recv(size)

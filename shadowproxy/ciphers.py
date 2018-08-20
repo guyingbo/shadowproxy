@@ -25,26 +25,22 @@ class AEADCipher(BaseCipher, metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
     def KEY_SIZE(self):
-        pass
+        ""
 
     @property
     @abc.abstractmethod
     def SALT_SIZE(self):
-        pass
+        ""
 
     @property
     @abc.abstractmethod
     def NONCE_SIZE(self):
-        pass
+        ""
 
     @property
     @abc.abstractmethod
     def TAG_SIZE(self):
-        pass
-
-    @property
-    def length_size(self):
-        return self.TAG_SIZE + 2
+        ""
 
     def _derive_subkey(self, salt: bytes) -> bytes:
         return HKDF(
@@ -83,7 +79,7 @@ class AEADCipher(BaseCipher, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def new_cipher(self, subkey: bytes, nonce: bytes):
-        pass
+        ""
 
 
 class AES128GCM(AEADCipher):
@@ -125,12 +121,12 @@ class StreamCipher(BaseCipher, metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
     def KEY_SIZE(self):
-        pass
+        ""
 
     @property
     @abc.abstractmethod
     def IV_SIZE(self):
-        pass
+        ""
 
     def random_iv(self):
         return os.urandom(self.IV_SIZE)
@@ -154,7 +150,7 @@ class StreamCipher(BaseCipher, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def new_cipher(self, key: bytes, iv: bytes):
-        pass
+        ""
 
 
 class AES256CFB(StreamCipher):

@@ -52,9 +52,9 @@ def Socks5RequestParser(auth=False):
     if cmd == 1:  # connect
         pass
     elif cmd == 2:  # bind
-        raise Exception("doesn't support yet")
+        raise Exception("doesn't support bind yet")
     elif cmd == 3:  # associate
-        pass
+        raise Exception("doesn't support associate yes")
     else:
         raise Exception(f"unknown cmd: {cmd}")
     target_addr = yield from read_addr()

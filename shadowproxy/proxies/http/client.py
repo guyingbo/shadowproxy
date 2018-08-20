@@ -5,7 +5,7 @@ from ..base.client import ClientBase
 
 class HTTPOnlyClient(ClientBase):
     async def init(self):
-        pass
+        ""
 
     async def http_request(
         self, uri: str, method: str = "GET", headers: list = None, response_cls=None
@@ -14,10 +14,11 @@ class HTTPOnlyClient(ClientBase):
             uri = "http" + uri[5:]
         headers = headers or []
         headers.append(b"Proxy-Connection: Keep-Alive")
-        if self.ns.auth:
+        auth = getattr(self.ns, "auth", None)
+        if auth:
             headers.append(
                 b"Proxy-Authorization: Basic %s"
-                % base64.b64encode(b":".join(self.ns.auth))
+                % base64.b64encode(b":".join(auth))
             )
         return await super().http_request(uri, method, headers, response_cls)
 

@@ -11,7 +11,8 @@ class SocksClient(ClientBase):
 
     async def init(self):
         response_parser = Socks5ResponseParser()
-        if self.ns.auth:
+        auth = getattr(self.ns, "auth", None)
+        if auth:
             methods = b"\x00\x02"
         else:
             methods = b"\x00"

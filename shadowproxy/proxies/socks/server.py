@@ -33,7 +33,6 @@ class SocksProxy(ProxyBase):
                 if redundant:
                     await self.client.sendall(redundant)
                 await self.client.sendall(self._make_resp())
-            gvars.logger.info(self)
             break
 
         if via_client:

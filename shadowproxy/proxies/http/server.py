@@ -63,7 +63,6 @@ class HTTPProxy(ProxyBase):
             self.target_addr = (url.hostname.decode(), url.port or 80)
             newpath = url._replace(netloc=b"", scheme=b"").geturl()
         via_client = await self.connect_server(self.target_addr)
-        gvars.logger.info(self)
         async with via_client:
             if method == b"CONNECT":
                 await self.client.sendall(
