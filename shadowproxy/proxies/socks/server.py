@@ -13,30 +13,30 @@ class SocksProxy(ProxyBase):
         self.plugin = plugin
 
     async def _run(self):
-        socks5 = Socks5RequestParser(self.auth)
+        socks5_parser = Socks5RequestParser(self.auth)
 
         via_client = None
         while True:
             data = await self.client.recv(gvars.PACKET_SIZE)
             if not data:
                 break
-            socks5.send(data)
-            data = socks5.read()
+            socks5_parser.send(data)
+            data = socks5_parser.read()
             if data:
                 await self.client.sendall(data)
-            if not socks5.has_result:
+            if not socks5_parser.has_result:
                 continue
-            self.target_addr, cmd = socks5.get_result()
+            self.target_addr, cmd = socks5_parser.get_result()
             if cmd == 1:  # connect
                 via_client = await self.connect_server(self.target_addr)
-                redundant = socks5.input.read()
-                if redundant:
-                    await self.client.sendall(redundant)
                 await self.client.sendall(self._make_resp())
             break
 
         if via_client:
             async with via_client:
+                redundant = socks5_parser.input.read()
+                if redundant:
+                    await via_client.sendall(redundant)
                 await self.relay(via_client)
 
     def _make_resp(self, code=0, host="0.0.0.0", port=0):
