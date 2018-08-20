@@ -72,3 +72,13 @@ def Socks5ResponseParser():
     assert data[1] == 0, f"failed REP with code: {data[1]}"
     bind_addr = yield from read_addr()
     return bind_addr
+
+
+@ohneio.protocol
+def Socks4ResponseParser():
+    data = memoryview((yield from ohneio.read(8)))
+    assert data[0] == 0, f"bad socks version: {data[0]}"
+    assert data[1] == 90, f"bad CD code: {data[1]}"
+    port = int.from_bytes(data[2:4], "big")
+    ip = socket.inet_ntoa(data[4:])
+    return (ip, port)
