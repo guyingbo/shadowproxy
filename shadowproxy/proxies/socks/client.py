@@ -4,6 +4,7 @@ from ... import gvars
 from ..base.client import ClientBase
 from ...utils import pack_addr
 from .parser import Socks5ResponseParser, Socks4ResponseParser
+from ...utils import set_disposable_recv
 
 
 class SocksClient(ClientBase):
@@ -28,14 +29,7 @@ class SocksClient(ClientBase):
             if response_parser.has_result:
                 break
         redundant = response_parser.input.read()
-        if redundant:
-            recv = self.sock.recv
-
-            async def disposable_recv(size):
-                self.sock.recv = recv
-                return redundant
-
-            self.sock.recv = disposable_recv
+        set_disposable_recv(self.sock, redundant)
 
 
 class Socks4Client(ClientBase):
@@ -55,14 +49,7 @@ class Socks4Client(ClientBase):
             if response_parser.has_result:
                 break
         redundant = response_parser.input.read()
-        if redundant:
-            recv = self.sock.recv
-
-            async def disposable_recv(size):
-                self.sock.recv = recv
-                return redundant
-
-            self.sock.recv = disposable_recv
+        set_disposable_recv(self.sock, redundant)
 
 
 def pack_ipv4(addr, userid: bytes = b"\x01\x01") -> bytes:

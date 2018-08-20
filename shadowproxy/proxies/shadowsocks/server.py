@@ -15,11 +15,12 @@ class SSProxy(ProxyBase):
     async def _run(self):
         addr_parser = AddrParser()
 
-        via_client = None
         if hasattr(self.plugin, "make_recv_func"):
             self._recv = self.plugin.make_recv_func(self.client)
         else:
             self._recv = self.client.recv
+
+        via_client = None
         while True:
             data = await self._recv(gvars.PACKET_SIZE)
             if not data:

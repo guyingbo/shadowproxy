@@ -1,6 +1,7 @@
 import base64
 from ... import gvars, __version__
 from ..base.client import ClientBase
+from ...utils import set_disposable_recv
 
 
 class HTTPOnlyClient(ClientBase):
@@ -57,11 +58,4 @@ class HTTPClient(ClientBase):
             gvars.logger.debug(f"{self} got {data}")
             raise Exception(data)
         redundant = buf_mem[index + 4 :].tobytes()
-        if redundant:
-            recv = self.sock.recv
-
-            async def disposable_recv(size):
-                self.sock.recv = recv
-                return redundant
-
-            self.sock.recv = disposable_recv
+        set_disposable_recv(self.sock, redundant)
