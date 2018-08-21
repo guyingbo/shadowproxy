@@ -1,0 +1,7 @@
+[run]
+source = shadowproxy
+
+[report]
+include =
+    shadowproxy/*.py
+    tests/*.py
