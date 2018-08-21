@@ -1,5 +1,7 @@
 import curio
+from shadowproxy import gvars
 from shadowproxy.cli import get_server
+gvars.logger.setLevel(0)
 
 
 async def make_request(client):

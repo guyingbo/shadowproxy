@@ -5,6 +5,7 @@
 [![Version](https://img.shields.io/pypi/v/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
 [![Format](https://img.shields.io/pypi/format/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
 [![License](https://img.shields.io/pypi/l/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
+[![codecov](https://codecov.io/gh/guyingbo/shadowproxy/branch/master/graph/badge.svg)](https://codecov.io/gh/guyingbo/shadowproxy)
 
 
 ## Intro
@@ -68,3 +69,34 @@ shadowproxy requires Python3.6+
 ```
 pip install shadowproxy
 ```
+
+## Features
+
+### supported protocols
+
+protocol | server | client | scheme
+--- | --- | ---
+socks5 | [checkbox:checked] | [checkbox:checked] | socks://
+socks4 | | [checkbox:checked] | socks4://
+ss | [checkbox:checked] | [checkbox:checked] | ss://
+ss aead | [checkbox:checked] | | ss://
+http | [checkbox:checked] | [checkbox:checked] | httponly://
+http connect | [checkbox:checked] | [checkbox:checked] | http://
+
+### supported plugins
+
+plugin | server | client
+http_simple | [checkbox:checked] | [checkbox:checked]
+tls1.2_ticket_auth | [checkbox:checked] |
+
+### support ciphers
+
+* aes-256-cfb
+* aes-128-cfb
+* aes-192-cfb
+* chacha20
+* salsa20
+* rc4
+* aes-256-gcm
+* aes-192-gcm
+* aes-128-gcm
