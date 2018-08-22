@@ -81,7 +81,7 @@ socks4 | | ✓ | socks4://
 ss | ✓ | ✓ | ss://
 ss aead | ✓ | | ss://
 http | ✓ | ✓ | httponly://
-http connect | ✓ | ✓ | http://
+http connect(tunnel) | ✓ | ✓ | http://
 transparent proxy | ✓ | | red://
 
 ### supported plugins

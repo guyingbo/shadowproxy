@@ -64,7 +64,10 @@ def get_server(uri, is_via=False):
         )
     if loc:
         host, _, port = loc.partition(":")
-        port = int(port)
+        if not port:
+            port = gvars.default_ports[url.scheme]
+        else:
+            port = int(port)
         bind_addr = (host, port)
     else:
         raise Exception("You must specify a port")
@@ -100,6 +103,11 @@ def get_server(uri, is_via=False):
     return server, bind_addr, url.scheme
 
 
+def get_client(uri):
+    ns = get_server(uri, is_via=True)
+    return ns.new()
+
+
 async def multi_server(*servers):
     addrs = []
     async with curio.TaskGroup() as g:
@@ -116,9 +124,7 @@ async def multi_server(*servers):
         gvars.logger.debug(f'ss -o "( {ss_filter} )"')
 
 
-async def udp_server_socket(
-    host, port, *, family=socket.AF_INET, reuse_address=True
-):
+async def udp_server_socket(host, port, *, family=socket.AF_INET, reuse_address=True):
     sock = socket.socket(family, socket.SOCK_DGRAM)
     try:
         sock.bind((host, port))
