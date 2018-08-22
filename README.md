@@ -76,19 +76,20 @@ pip install shadowproxy
 
 protocol | server | client | scheme
 --- | --- | --- | ---
-socks5 | ✔ | ✔ | socks://
-socks4 | | ✔ | socks4://
-ss | ✔ | ✔ | ss://
-ss aead | ✔ | | ss://
-http | ✔ | ✔ | httponly://
-http connect | ✔ | ✔ | http://
+socks5 | ✓ | ✓ | socks://
+socks4 | | ✓ | socks4://
+ss | ✓ | ✓ | ss://
+ss aead | ✓ | | ss://
+http | ✓ | ✓ | httponly://
+http connect | ✓ | ✓ | http://
+transparent proxy | ✓ | | red://
 
 ### supported plugins
 
 plugin | server | client
 --- | --- | ---
-http_simple | ✔ | ✔ ✓
-tls1.2_ticket_auth | ✔ |
+http_simple | ✓ | ✓
+tls1.2_ticket_auth | ✓ |
 
 ### supported ciphers
 
