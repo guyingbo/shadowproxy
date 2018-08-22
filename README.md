@@ -87,10 +87,10 @@ http connect | ✔ | ✔ | http://
 
 plugin | server | client
 --- | --- | ---
-http_simple | ✔ | ✔
+http_simple | ✔ | ✔ ✓
 tls1.2_ticket_auth | ✔ |
 
-### support ciphers
+### supported ciphers
 
 * aes-256-cfb
 * aes-128-cfb

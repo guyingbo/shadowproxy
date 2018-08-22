@@ -54,6 +54,11 @@ class ClientBase(abc.ABC):
         if self.sock:
             await self.sock.__aexit__(et, e, tb)
 
+    async def close(self):
+        if self.sock:
+            await self.sock.close()
+            self.sock = None
+
     @property
     def bind_address(self) -> str:
         return f"{self.ns.bind_addr[0]}:{self.ns.bind_addr[1]}"
@@ -64,6 +69,8 @@ class ClientBase(abc.ABC):
 
     async def connect(self, target_addr):
         self.target_addr = target_addr
+        if self.sock:
+            return
         self.sock = await open_connection(*self.ns.bind_addr)
 
     @abc.abstractmethod
@@ -75,10 +82,6 @@ class ClientBase(abc.ABC):
 
     async def sendall(self, data):
         return await self.sock.sendall(data)
-
-    async def close(self):
-        if self.sock:
-            await self.sock.close()
 
     async def http_request(
         self,

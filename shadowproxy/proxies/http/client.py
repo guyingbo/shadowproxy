@@ -54,8 +54,8 @@ class HTTPClient(ClientBase):
             break
         buf_mem = memoryview(buf)
         header_lines = buf_mem[:index].tobytes()
-        if not header_lines.startswith(b"HTTP/1.1 200"):
+        if header_lines.split(None, 2)[1] != b"200":
             gvars.logger.debug(f"{self} got {data}")
-            raise Exception(data)
+            raise Exception(header_lines.split(b"\r\n")[0])
         redundant = buf_mem[index + 4 :].tobytes()
         set_disposable_recv(self.sock, redundant)

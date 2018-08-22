@@ -49,7 +49,7 @@ class SSUDPServer:
         listen_addr = sock.getsockname()
         async with curio.TaskGroup as g:
             while True:
-                data, addr = await sock.recvfrom(8192)
+                data, addr = await sock.recvfrom(gvars.PACKET_SIZE)
                 if len(data) <= self.cipher.IV_SIZE:
                     continue
                 if addr not in self.addr2client:
@@ -79,7 +79,8 @@ class SSUDPServer:
 
 
 class UDPClient:
-    def __init__(self):
+    def __init__(self, ns):
+        self.ns = ns
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._relay_task = None
 
@@ -109,21 +110,16 @@ class UDPClient:
 
 
 class SSUDPClient(UDPClient):
-    def __init__(self, cipher, host, port):
-        self.cipher = cipher
-        self.raddr = (host, port)
-        super().__init__()
-
     async def sendto(self, data, addr):
         self.taddr = addr
-        iv, encrypt = self.cipher.make_encrypter()
+        iv, encrypt = self.ns.cipher.make_encrypter()
         payload = iv + encrypt(pack_addr(addr) + data)
-        await self.sock.sendto(payload, self.raddr)
+        await self.sock.sendto(payload, self.ns.bind_addr)
 
     def _unpack(self, data):
-        iv = data[: self.cipher.IV_SIZE]
-        decrypt = self.cipher.make_decrypter(iv)
-        data = decrypt(data[self.cipher.IV_SIZE :])
+        iv = data[: self.ns.cipher.IV_SIZE]
+        decrypt = self.ns.cipher.make_decrypter(iv)
+        data = decrypt(data[self.ns.cipher.IV_SIZE :])
         addr, payload = unpack_addr(data)
         return payload, addr
 
@@ -134,7 +130,7 @@ class SSUDPClient(UDPClient):
             gvars.logger.debug(
                 f"udp: {addr[0]}:{addr[1]} <- "
                 f"{listen_addr[0]}:{listen_addr[1]} <- "
-                f"{self.raddr[0]}:{self.raddr[1]} <- "
+                f"{self.ns.bind_addr[0]}:{self.ns.bind_addr[1]} <- "
                 f"{self.taddr[0]}:{self.taddr[1]}"
             )
             if sendfunc is None:
