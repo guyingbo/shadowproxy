@@ -56,7 +56,7 @@ def get_server(uri, is_via=False):
         cipher_name, _, password = userinfo.partition(":")
         if url.scheme.startswith("ss"):
             kwargs["cipher"] = ciphers[cipher_name](password)
-        elif url.scheme in ("http", "https", "socks"):
+        elif url.scheme in ("http", "https", "socks", "httponly"):
             kwargs["auth"] = (cipher_name.encode(), password.encode())
     elif url.scheme in ("ss", "ssudp"):
         raise argparse.ArgumentTypeError(

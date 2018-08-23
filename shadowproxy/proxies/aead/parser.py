@@ -6,9 +6,9 @@ class AEADProtocol:
         self.cipher = cipher
 
     def new(self, *args, **kwargs):
-        return iofree.Parser(self.aead(*args, **kwargs))
+        return iofree.Parser(self.reader(*args, **kwargs))
 
-    def aead(self):
+    def reader(self):
         salt = yield from iofree.read(self.cipher.SALT_SIZE)
         self.decrypt = self.cipher.make_decrypter(salt)
         while True:

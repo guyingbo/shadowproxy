@@ -24,16 +24,16 @@ async def main(server_coro, client):
 
 
 def test_http():
-    server, bind_addr, _ = get_server("http://127.0.0.1:0")
+    server, bind_addr, _ = get_server("http://user:password@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
-    client = get_client(f"http://{bind_address}")
+    client = get_client(f"http://user:password@{bind_address}")
     curio.run(main(server, client))
 
 
 def test_http_only():
-    server, bind_addr, _ = get_server("http://127.0.0.1:0")
+    server, bind_addr, _ = get_server("http://user:password@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
-    client = get_client(f"httponly://{bind_address}")
+    client = get_client(f"httponly://user:password@{bind_address}")
     curio.run(main(server, client))
 
 
