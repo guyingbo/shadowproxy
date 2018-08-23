@@ -17,7 +17,7 @@ class HTTPProxy(ProxyBase):
         while True:
             data = await self.client.recv(gvars.PACKET_SIZE)
             if not data:
-                return
+                raise Exception("incomplete http connect request")
             parser.send(data)
             if parser.has_result:
                 break
@@ -25,7 +25,6 @@ class HTTPProxy(ProxyBase):
         if self.auth:
             pauth = ns.headers.get(b"Proxy-Authorization", None)
             httpauth = b"Basic " + base64.b64encode(b":".join(self.auth))
-            print(httpauth, pauth)
             if httpauth != pauth:
                 await self.client.sendall(
                     ns.ver + b" 407 Proxy Authentication Required\r\n"
@@ -33,11 +32,6 @@ class HTTPProxy(ProxyBase):
                     b'Proxy-Authenticate: Basic realm="simple"\r\n\r\n'
                 )
                 raise Exception("Unauthorized HTTP Request")
-        lines = b"\r\n".join(
-            b"%s: %s" % (k, v)
-            for k, v in ns.headers.items()
-            if not k.startswith(b"Proxy-")
-        )
         if ns.method == b"CONNECT":
             self.proto = "HTTPS"
             host, _, port = ns.path.partition(b":")
@@ -63,6 +57,11 @@ class HTTPProxy(ProxyBase):
                 )
                 remote_req_headers = b""
             else:
+                lines = b"\r\n".join(
+                    b"%s: %s" % (k, v)
+                    for k, v in ns.headers.items()
+                    if not k.startswith(b"Proxy-")
+                )
                 remote_req_headers = b"%s %s %s\r\n%s\r\n\r\n" % (
                     ns.method,
                     newpath,
