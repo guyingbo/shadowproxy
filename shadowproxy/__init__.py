@@ -44,4 +44,4 @@ tunneludp://:8527/?target=8.8.8.8:53&via=ssudp://aes-256-cfb:password@127.0.0.1:
   sudo shadowproxy -v \
 tproxyudp://:8527/?via=ssudp://aes-256-cfb:password@127.0.0.1:8888
 """
-__version__ = "0.3.0"
+__version__ = "0.4.0"
