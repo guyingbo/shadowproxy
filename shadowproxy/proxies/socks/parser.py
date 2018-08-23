@@ -27,7 +27,7 @@ def socks5_request(auth=False):
     assert nmethods != 0, f"nmethods can't be 0"
     methods = yield from iofree.read(nmethods)
     if auth and b"\x02" not in methods:
-        yield from iofree.write(b"\x05\xff")
+        yield from iofree.write(b"\x05\x02")
         raise Exception("server needs authentication")
     elif b"\x00" not in methods:
         yield from iofree.write(b"\x05\x00")
@@ -35,7 +35,7 @@ def socks5_request(auth=False):
     if auth:
         yield from iofree.write(b"\x05\x02")
         auth_ver, username_length = yield from iofree.read_struct("!BB")
-        assert auth_ver == 1
+        assert auth_ver == 1, f"invalid auth version {auth_ver}"
         username = yield from iofree.read(username_length)
         password_length = (yield from iofree.read(1))[0]
         password = yield from iofree.read(password_length)
@@ -60,11 +60,15 @@ def socks5_request(auth=False):
 
 
 @iofree.parser
-def socks5_response():
+def socks5_response(auth):
     data = yield from iofree.read(2)
     assert data[0] == 5, f"bad socks version: {data[0]}"
     method = data[1]
     assert method in (0, 2), f"bad method {data[1]}"
+    if auth:
+        auth_ver, status = yield from iofree.read_struct("!BB")
+        assert auth_ver == 1, f"invalid auth version {auth_ver}"
+        assert status == 0, f"invalid status {status}"
     data = yield from iofree.read(3)
     assert data[0] == 5, f"bad socks version: {data[0]}"
     assert data[1] == 0, f"failed REP with code: {data[1]}"

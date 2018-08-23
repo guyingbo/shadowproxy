@@ -28,6 +28,10 @@ def is_local(host: str) -> bool:
     return any(address in nw for nw in local_networks)
 
 
+def pack_bytes(data: bytes, length: int=1) -> bytes:
+    return len(data).to_bytes(length, "big") + data
+
+
 def pack_addr(addr) -> bytes:
     host, port = addr
     try:  # IPV4

@@ -44,6 +44,13 @@ def test_sock5():
     curio.run(main(server, client))
 
 
+def test_sock5_with_auth():
+    server, bind_addr, _ = get_server("socks://user:password@127.0.0.1:0")
+    bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    client = get_client(f"socks://user:password@{bind_address}")
+    curio.run(main(server, client))
+
+
 def test_ss():
     server, bind_addr, _ = get_server("ss://aes-256-cfb:123456@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
