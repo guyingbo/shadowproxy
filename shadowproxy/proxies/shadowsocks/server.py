@@ -1,6 +1,6 @@
 from ... import gvars
 from ..base.server import ProxyBase
-from .parser import AddrParser, SSParser
+from .parser import addr_reader, ss_reader
 
 
 class SSProxy(ProxyBase):
@@ -10,10 +10,10 @@ class SSProxy(ProxyBase):
         self.cipher = cipher
         self.via = via
         self.plugin = plugin
-        self.ss_parser = SSParser(self.cipher)
+        self.ss_parser = ss_reader.parser(self.cipher)
 
     async def _run(self):
-        addr_parser = AddrParser()
+        addr_parser = addr_reader.parser()
 
         if hasattr(self.plugin, "make_recv_func"):
             self._recv = self.plugin.make_recv_func(self.client)
@@ -36,7 +36,7 @@ class SSProxy(ProxyBase):
 
         if via_client:
             async with via_client:
-                redundant = addr_parser.input.read()
+                redundant = addr_parser.readall()
                 if redundant:
                     await via_client.sendall(redundant)
                 await self.relay(via_client)

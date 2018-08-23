@@ -1,11 +1,11 @@
 from ...utils import pack_addr
 from ..base.client import ClientBase
-from .parser import SSParser
+from .parser import ss_reader
 
 
 class SSClient(ClientBase):
     def _init(self):
-        self.ss_parser = SSParser(self.ns.cipher)
+        self.ss_parser = ss_reader.parser(self.ns.cipher)
 
     async def init(self):
         plugin = getattr(self.ns, "plugin", None)

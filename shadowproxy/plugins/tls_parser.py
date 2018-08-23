@@ -2,7 +2,7 @@ import os
 import hmac
 import random
 import struct
-import ohneio
+import iofree
 import hashlib
 import binascii
 from time import time
@@ -12,24 +12,20 @@ def pack_uint16(s):
     return len(s).to_bytes(2, "big") + s
 
 
-def pack_uint24(s):
-    return len(s).to_bytes(3, "big") + s
-
-
 def sni(host):
     return b"\x00\x00" + pack_uint16(pack_uint16(pack_uint16(b"\x00" + host)))
 
 
-@ohneio.protocol
-def TLS1_2RequestParser(plugin):
+@iofree.parser
+def tls1_2_request(plugin):
     tls_version = plugin.tls_version
-    tls_plaintext_head = memoryview((yield from ohneio.read(5)))
+    tls_plaintext_head = memoryview((yield from iofree.read(5)))
     assert (
         tls_plaintext_head[:3] == b"\x16\x03\x01"
     ), "invalid tls head: handshake(22) protocol_version(3.1)"
     length = int.from_bytes(tls_plaintext_head[-2:], "big")
     assert length == length & 0x3FFF, f"{length} is over 2^14"
-    fragment = memoryview((yield from ohneio.read(length)))
+    fragment = memoryview((yield from iofree.read(length)))
     assert fragment[0] == 1, "expect client_hello: msg_type(1)"
     handshake_length = int.from_bytes(fragment[1:4], "big")
     client_hello = fragment[4 : handshake_length + 4]
@@ -79,13 +75,13 @@ def TLS1_2RequestParser(plugin):
     server_hello += hmac.new(
         plugin.proxy.cipher.master_key + session_id, server_hello, hashlib.sha1
     ).digest()[:10]
-    yield from ohneio.write(server_hello)
+    yield from iofree.write(server_hello)
     yield from ChangeCipherReader(plugin, session_id)
     return "done"
 
 
 def ChangeCipherReader(plugin, session_id):
-    data = memoryview((yield from ohneio.read(11)))
+    data = memoryview((yield from iofree.read(11)))
     assert data[0] == 0x14, f"{data[0]} != change_cipher_spec(20) {data.tobytes()}"
     assert (
         data[1:3] == plugin.tls_version
@@ -97,7 +93,7 @@ def ChangeCipherReader(plugin, session_id):
     ), f"{data[7:9]} != version({plugin.tls_version})"
     assert data[9] == 0x00, f"{data[9]} != Finish(0)"
     verify_len = int.from_bytes(data[9:11], "big")
-    verify = memoryview((yield from ohneio.read(verify_len)))
+    verify = memoryview((yield from iofree.read(verify_len)))
     sha1 = hmac.new(
         plugin.proxy.cipher.master_key + session_id,
         b"".join([data, verify[:-10]]),
@@ -106,15 +102,15 @@ def ChangeCipherReader(plugin, session_id):
     assert sha1 == verify[-10:], "hmac verify failed"
 
 
-@ohneio.protocol
-def Receiver(plugin):
+@iofree.parser
+def application_data(plugin):
     while True:
-        data = memoryview((yield from ohneio.read(5)))
+        data = memoryview((yield from iofree.read(5)))
         assert data[0] == 0x17, f"{data[0]} != application_data(23) {data.tobytes()}"
         assert (
             data[1:3] == plugin.tls_version
         ), f"{data[1:3].tobytes()} != version({plugin.tls_version})"
         size = int.from_bytes(data[3:], "big")
         assert size == size & 0x3FFF, f"{size} is over 2^14"
-        data = yield from ohneio.read(size)
-        yield from ohneio.write(data)
+        data = yield from iofree.read(size)
+        yield from iofree.write(data)

@@ -2,6 +2,7 @@ import base64
 from ... import gvars, __version__
 from ..base.client import ClientBase
 from ...utils import set_disposable_recv
+from .parser import http_response
 
 
 class HTTPOnlyClient(ClientBase):
@@ -18,8 +19,7 @@ class HTTPOnlyClient(ClientBase):
         auth = getattr(self.ns, "auth", None)
         if auth:
             headers.append(
-                b"Proxy-Authorization: Basic %s"
-                % base64.b64encode(b":".join(auth))
+                b"Proxy-Authorization: Basic %s" % base64.b64encode(b":".join(auth))
             )
         return await super().http_request(uri, method, headers, response_cls)
 
@@ -39,23 +39,18 @@ class HTTPClient(ClientBase):
             )
         headers_str += "\r\n"
         await self.sock.sendall(headers_str.encode())
-        buf = bytearray()
-        start = 0
+
+        parser = http_response.parser()
         while True:
             data = await self.sock.recv(gvars.PACKET_SIZE)
             if not data:
-                return
-            buf.extend(data)
-            index = buf.find(b"\r\n\r\n", start)
-            if index == -1:
-                start = len(buf) - 3
-                start = start if start > 0 else 0
-                continue
-            break
-        buf_mem = memoryview(buf)
-        header_lines = buf_mem[:index].tobytes()
-        if header_lines.split(None, 2)[1] != b"200":
-            gvars.logger.debug(f"{self} got {data}")
-            raise Exception(header_lines.split(b"\r\n")[0])
-        redundant = buf_mem[index + 4 :].tobytes()
+                raise Exception("http client handshake failed")
+            parser.send(data)
+            if parser.has_result:
+                break
+        namespace = parser.get_result()
+        assert (
+            namespace.code == b"200"
+        ), f"bad status code: {namespace.code} {namespace.status}"
+        redundant = parser.readall()
         set_disposable_recv(self.sock, redundant)

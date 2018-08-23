@@ -1,7 +1,7 @@
 import random
 from .. import gvars
 from .base import Plugin
-from .tls_parser import TLS1_2RequestParser, Receiver
+from .tls_parser import tls1_2_request, application_data
 from ..utils import set_disposable_recv
 
 
@@ -18,7 +18,7 @@ class TLS1_2Plugin(Plugin):
         self.time_tolerance = 5 * 60
 
     async def init_server(self, client):
-        tls_parser = TLS1_2RequestParser(self)
+        tls_parser = tls1_2_request.parser(self)
         hello_sent = False
         while True:
             data = await client.recv(gvars.PACKET_SIZE)
@@ -39,15 +39,15 @@ class TLS1_2Plugin(Plugin):
         set_disposable_recv(client, redundant)
 
     def make_recv_func(self, client):
-        receiver = Receiver(self)
+        data_parser = application_data.parser(self)
 
         async def recv(size):
             while True:
                 data = await client.recv(size)
                 if not data:
                     return data
-                receiver.send(data)
-                data = receiver.read()
+                data_parser.send(data)
+                data = data_parser.read()
                 if data:
                     return data
 

@@ -1,7 +1,7 @@
 from ... import gvars
-from .parser import AEADParser
+from .parser import AEADProtocol
 from ..base.server import ProxyBase
-from ..shadowsocks.parser import AddrParser
+from ..shadowsocks.parser import addr_reader
 
 
 class AEADProxy(ProxyBase):
@@ -11,11 +11,11 @@ class AEADProxy(ProxyBase):
         self.cipher = cipher
         self.via = via
         self.plugin = plugin
-        self.aead_parser = AEADParser(self.cipher).read()
 
     async def _run(self):
-        aead_parser = AEADParser(self.cipher).new()
-        addr_parser = AddrParser()
+        aead_parser = AEADProtocol(self.cipher).new()
+        self.aead_parser = aead_parser
+        addr_parser = addr_reader.parser()
 
         if hasattr(self.plugin, "make_recv_func"):
             self._recv = self.plugin.make_recv_func(self.client)
@@ -40,7 +40,7 @@ class AEADProxy(ProxyBase):
 
         if via_client:
             async with via_client:
-                redundant = addr_parser.input.read()
+                redundant = addr_parser.readall()
                 if redundant:
                     await via_client.sendall(redundant)
                 await self.relay(via_client)

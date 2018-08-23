@@ -40,7 +40,7 @@ setup(
         "curio>=0.9",
         "pylru>=1.0.9",
         # "microstats>=0.1.0",
-        "ohneio",
+        "iofree>=0.1.1",
         "httptools",
     ],
     entry_points={"console_scripts": ["shadowproxy = shadowproxy.cli:main"]},

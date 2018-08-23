@@ -3,7 +3,7 @@ from curio import socket
 from ... import gvars
 from ..base.client import ClientBase
 from ...utils import pack_addr
-from .parser import Socks5ResponseParser, Socks4ResponseParser
+from .parser import socks5_response, socks4_response
 from ...utils import set_disposable_recv
 
 
@@ -11,7 +11,7 @@ class SocksClient(ClientBase):
     name = "socks"
 
     async def init(self):
-        response_parser = Socks5ResponseParser()
+        response_parser = socks5_response.parser()
         auth = getattr(self.ns, "auth", None)
         if auth:
             methods = b"\x00\x02"
@@ -28,13 +28,13 @@ class SocksClient(ClientBase):
             response_parser.send(data)
             if response_parser.has_result:
                 break
-        redundant = response_parser.input.read()
+        redundant = response_parser.readall()
         set_disposable_recv(self.sock, redundant)
 
 
 class Socks4Client(ClientBase):
     async def init(self):
-        response_parser = Socks4ResponseParser()
+        response_parser = socks4_response.parser()
         info = await socket.getaddrinfo(
             *self.target_addr, socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP
         )
@@ -48,7 +48,7 @@ class Socks4Client(ClientBase):
             response_parser.send(data)
             if response_parser.has_result:
                 break
-        redundant = response_parser.input.read()
+        redundant = response_parser.readall()
         set_disposable_recv(self.sock, redundant)
 
 
