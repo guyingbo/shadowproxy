@@ -20,7 +20,6 @@ class SocksClient(ClientBase):
         if auth:
             handshake += b"\x01" + pack_bytes(auth[0]) + pack_bytes(auth[1])
         request = b"\x05\x01\x00" + pack_addr(self.target_addr)
-        print(handshake + request)
         await self.sock.sendall(handshake + request)
         response_parser = socks5_response.parser(auth)
         while True:
