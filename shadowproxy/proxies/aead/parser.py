@@ -5,7 +5,7 @@ class AEADProtocol:
     def __init__(self, cipher):
         self.cipher = cipher
 
-    def new(self, *args, **kwargs):
+    def parser(self, *args, **kwargs):
         return iofree.Parser(self.reader(*args, **kwargs))
 
     def reader(self):

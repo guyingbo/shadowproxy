@@ -65,3 +65,10 @@ def test_ss_http_simple():
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
     client = get_client(f"ss://chacha20:123456@{bind_address}/?plugin=http_simple")
     curio.run(main(server, client))
+
+
+def test_aead():
+    server, bind_addr, _ = get_server("ss://aes-128-gcm:123456@127.0.0.1:0")
+    bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    client = get_client(f"ss://aes-128-gcm:123456@{bind_address}")
+    curio.run(main(server, client))

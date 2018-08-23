@@ -34,7 +34,7 @@ def test_aead():
     cipher = AES128GCM(secrets.token_urlsafe(20))
     salt, encrypt = cipher.make_encrypter()
     length = len(salt) // 2
-    aead = AEADProtocol(cipher).new()
+    aead = AEADProtocol(cipher).parser()
     aead.send(salt[:length])
     assert aead.read() == b""
     data = os.urandom(20)

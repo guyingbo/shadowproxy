@@ -56,6 +56,8 @@ def get_server(uri, is_via=False):
         cipher_name, _, password = userinfo.partition(":")
         if url.scheme.startswith("ss"):
             kwargs["cipher"] = ciphers[cipher_name](password)
+            if not kwargs["cipher"].is_stream_cipher:
+                proto = via_protos["aead"] if is_via else server_protos["aead"]
         elif url.scheme in ("http", "https", "socks", "httponly"):
             kwargs["auth"] = (cipher_name.encode(), password.encode())
     elif url.scheme in ("ss", "ssudp"):

@@ -21,6 +21,7 @@ class BaseCipher:
 
 class AEADCipher(BaseCipher, metaclass=abc.ABCMeta):
     info = b"ss-subkey"
+    is_stream_cipher = False
 
     @property
     @abc.abstractmethod
@@ -118,6 +119,8 @@ class AES256GCM(AES128GCM):
 
 
 class StreamCipher(BaseCipher, metaclass=abc.ABCMeta):
+    is_stream_cipher = True
+
     @property
     @abc.abstractmethod
     def KEY_SIZE(self):

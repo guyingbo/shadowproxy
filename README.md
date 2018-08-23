@@ -79,7 +79,7 @@ protocol | server | client | scheme
 socks5 | ✓ | ✓ | socks://
 socks4 | | ✓ | socks4://
 ss | ✓ | ✓ | ss://
-ss aead | ✓ | | ss://
+ss aead | ✓ | ✓ | ss://
 http | ✓ | ✓ | httponly://
 http connect(tunnel) | ✓ | ✓ | http://
 transparent proxy | ✓ | | red://

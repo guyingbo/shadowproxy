@@ -13,7 +13,7 @@ class AEADProxy(ProxyBase):
         self.plugin = plugin
 
     async def _run(self):
-        aead_parser = AEADProtocol(self.cipher).new()
+        aead_parser = AEADProtocol(self.cipher).parser()
         self.aead_parser = aead_parser
         addr_parser = addr_reader.parser()
 
@@ -22,7 +22,6 @@ class AEADProxy(ProxyBase):
         else:
             self._recv = self.client.recv
 
-        via_client = None
         while True:
             data = await self._recv(gvars.PACKET_SIZE)
             if not data:
@@ -32,28 +31,27 @@ class AEADProxy(ProxyBase):
             if not data:
                 continue
             addr_parser.send(data)
-            if not addr_parser.has_result:
-                continue
-            self.target_addr, _ = addr_parser.get_result()
-            via_client = await self.connect_server(self.target_addr)
-            break
+            if addr_parser.has_result:
+                break
 
-        if via_client:
-            async with via_client:
-                redundant = addr_parser.readall()
-                if redundant:
-                    await via_client.sendall(redundant)
-                await self.relay(via_client)
+        self.target_addr, _ = addr_parser.get_result()
+        via_client = await self.connect_server(self.target_addr)
+
+        async with via_client:
+            redundant = addr_parser.readall()
+            if redundant:
+                await via_client.sendall(redundant)
+            await self.relay(via_client)
 
     async def recv(self, size):
-        while True:
-            data = await self._recv(size)
-            if not data:
-                return data
-            self.aead_parser.send(data)
-            data = self.aead_parser.read()
-            if data:
-                return data
+        data = await self._recv(size)
+        if not data:
+            return data
+        self.aead_parser.send(data)
+        data = self.aead_parser.read()
+        if data:
+            data = await self.recv(size)
+        return data
 
     async def sendall(self, data):
         packet = b""
