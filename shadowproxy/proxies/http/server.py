@@ -33,7 +33,7 @@ class HTTPProxy(ProxyBase):
                 )
                 raise Exception("Unauthorized HTTP Request")
         if ns.method == b"CONNECT":
-            self.proto = "HTTPS"
+            self.proto = "HTTP(CONNECT)"
             host, _, port = ns.path.partition(b":")
             self.target_addr = (host.decode(), int(port))
         else:

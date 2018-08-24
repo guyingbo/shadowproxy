@@ -1,4 +1,4 @@
-from .socks.server import SocksProxy
+from .socks.server import SocksProxy, Socks4Proxy
 from .socks.client import SocksClient, Socks4Client
 from .shadowsocks.server import SSProxy
 from .shadowsocks.client import SSClient
@@ -15,6 +15,7 @@ server_protos = {
     "socks": SocksProxy,
     "http": HTTPProxy,
     "red": TransparentProxy,
+    "socks4": Socks4Proxy,
 }
 via_protos = {
     "ss": SSClient,

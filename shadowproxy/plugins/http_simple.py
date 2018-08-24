@@ -2,6 +2,7 @@ from datetime import datetime
 from .. import gvars
 from .base import Plugin
 from ..utils import set_disposable_recv
+from ..proxies.http.parser import http_response, http_request
 
 request_tmpl = (
     b"GET / HTTP/1.1\r\n"
@@ -19,22 +20,16 @@ class HttpSimplePlugin(Plugin):
     name = "http_simple"
 
     async def init_server(self, client):
-        buf = bytearray()
-        start = 0
+        parser = http_request.parser()
         while True:
             data = await client.recv(gvars.PACKET_SIZE)
             if not data:
-                return
-            buf.extend(data)
-            index = buf.find(b"\r\n\r\n", start)
-            if index == -1:
-                start = len(buf) - 3
-                start = start if start > 0 else 0
-                continue
-            break
-        head = bytes.fromhex(
-            buf.split(b" ", 2)[1][1:].replace(b"%", b"").decode("ascii")
-        )
+                raise Exception("incomplete http request")
+            parser.send(data)
+            if parser.has_result:
+                break
+        namespace = parser.get_result()
+        head = bytes.fromhex(namespace.path[1:].replace(b"%", b"").decode("ascii"))
         await client.sendall(
             b"HTTP/1.1 200 OK\r\n"
             b"Connection: keep-alive\r\n"
@@ -45,29 +40,23 @@ class HttpSimplePlugin(Plugin):
             + b"\r\nServer: nginx\r\n"
             b"Vary: Accept-Encoding\r\n\r\n"
         )
-        redundant = head + memoryview(buf)[index + 4 :].tobytes()
+        redundant = head + parser.readall()
         set_disposable_recv(client, redundant)
 
     async def init_client(self, client):
         request = request_tmpl % client.target_address.encode()
         await client.sock.sendall(request)
-        buf = bytearray()
-        start = 0
+        parser = http_response.parser()
         while True:
             data = await client.sock.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("http_simple plugin handshake failed")
-            buf.extend(data)
-            index = buf.find(b"\r\n\r\n", start)
-            if index == -1:
-                start = len(buf) - 3
-                start = start if start > 0 else 0
-                continue
-            break
-        buf = memoryview(buf)
-        header_bytes = buf[:index]
-        valid_head = b"HTTP/1.1 200 OK"
-        if not header_bytes[:len(valid_head)] == valid_head:
-            raise Exception(f"bad response {header_bytes}")
-        redundant = buf[index + 4 :].tobytes()
+            parser.send(data)
+            if parser.has_result:
+                break
+        namespace = parser.get_result()
+        assert (
+            namespace.code == b"200"
+        ), f"bad status code {namespace.code} {namespace.status}"
+        redundant = parser.readall()
         set_disposable_recv(client.sock, redundant)

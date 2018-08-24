@@ -83,3 +83,17 @@ def socks4_response():
     assert cd == 90, f"bad CD code: {cd}"
     ip = socket.inet_ntoa(ip_bytes)
     return (ip, port)
+
+
+@iofree.parser
+def socks4_request():
+    vn, cd, port, dst_ip = yield from iofree.read_struct("!BBH4s")
+    assert vn == 4, f"bad socks version: {vn}"
+    assert cd == 1, f"invalid command {cd}"
+    user_id = yield from iofree.read_until(b"\x00", return_tail=False)
+    del user_id
+    if dst_ip[:3] == b"\x00\x00\x00":
+        hostname = yield from iofree.read_until(b"\x00", return_tail=False)
+    else:
+        hostname = socket.inet_ntoa(dst_ip)
+    return (hostname, port)

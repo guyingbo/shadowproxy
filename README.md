@@ -77,7 +77,7 @@ pip install shadowproxy
 protocol | server | client | scheme
 --- | --- | --- | ---
 socks5 | ✓ | ✓ | socks://
-socks4 | | ✓ | socks4://
+socks4 | ✓ | ✓ | socks4://
 ss | ✓ | ✓ | ss://
 ss aead | ✓ | ✓ | ss://
 http | ✓ | ✓ | httponly://
