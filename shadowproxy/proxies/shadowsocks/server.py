@@ -20,7 +20,6 @@ class SSProxy(ProxyBase):
         else:
             self._recv = self.client.recv
 
-        via_client = None
         while True:
             data = await self._recv(gvars.PACKET_SIZE)
             if not data:
@@ -28,18 +27,16 @@ class SSProxy(ProxyBase):
             self.ss_parser.send(data)
             data = self.ss_parser.read()
             addr_parser.send(data)
-            if not addr_parser.has_result:
-                continue
-            self.target_addr, _ = addr_parser.get_result()
-            via_client = await self.connect_server(self.target_addr)
-            break
+            if addr_parser.has_result:
+                break
+        self.target_addr, _ = addr_parser.get_result()
+        via_client = await self.connect_server(self.target_addr)
 
-        if via_client:
-            async with via_client:
-                redundant = addr_parser.readall()
-                if redundant:
-                    await via_client.sendall(redundant)
-                await self.relay(via_client)
+        async with via_client:
+            redundant = addr_parser.readall()
+            if redundant:
+                await via_client.sendall(redundant)
+            await self.relay(via_client)
 
     async def recv(self, size):
         data = await self._recv(size)
