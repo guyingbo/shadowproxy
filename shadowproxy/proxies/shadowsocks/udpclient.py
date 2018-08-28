@@ -5,6 +5,8 @@ from ...utils import pack_addr, unpack_addr
 
 
 class SSUDPClient(UDPClient):
+    proto = "SS(UDP)"
+
     async def sendto(self, data, addr):
         self.target_addr = addr
         iv, encrypt = self.ns.cipher.make_encrypter()

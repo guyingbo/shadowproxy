@@ -39,6 +39,8 @@ ss aead | ✓ | ✓ | ss://
 http | ✓ | ✓ | httponly://
 http connect | ✓ | ✓ | http://
 transparent proxy | ✓ | | red://
+tunnel(udp) | ✓ | | tunneludp://
+ss(udp) | ✓ | ✓ | ssudp://
 
 ### supported plugins
 

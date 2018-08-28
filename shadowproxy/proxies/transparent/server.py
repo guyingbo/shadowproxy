@@ -1,7 +1,7 @@
 import struct
-from .. import gvars
 from curio import socket
-from .base.server import ProxyBase
+from ... import gvars
+from ..base.server import ProxyBase
 
 SO_ORIGINAL_DST = 80
 
@@ -24,7 +24,3 @@ class TransparentProxy(ProxyBase):
         via_client = await self.connect_server(self.target_addr)
         async with via_client:
             await self.relay(via_client)
-
-
-class UDPTransparentProxy:
-    proto = "RED(UDP)"

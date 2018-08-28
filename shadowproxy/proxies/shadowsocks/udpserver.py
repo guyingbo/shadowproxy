@@ -5,6 +5,8 @@ from ..base.udpclient import UDPClient
 
 
 class SSUDPServer:
+    proto = "SS(UDP)"
+
     def __init__(self, cipher, via=None):
         self.cipher = cipher
         self.via = via or ViaNamespace(ClientClass=UDPClient)
