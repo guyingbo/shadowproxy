@@ -7,6 +7,9 @@ from .http.client import HTTPClient, HTTPOnlyClient
 from .transparent import TransparentProxy
 from .aead.server import AEADProxy
 from .aead.client import AEADClient
+from .tunnel.udpserver import TunnelUDPServer
+from .shadowsocks.udpserver import SSUDPServer
+from .shadowsocks.udpclient import SSUDPClient
 
 
 server_protos = {
@@ -16,6 +19,8 @@ server_protos = {
     "http": HTTPProxy,
     "red": TransparentProxy,
     "socks4": Socks4Proxy,
+    "tunneludp": TunnelUDPServer,
+    "ssudp": SSUDPServer,
 }
 via_protos = {
     "ss": SSClient,
@@ -24,4 +29,5 @@ via_protos = {
     "httponly": HTTPOnlyClient,
     "socks": SocksClient,
     "socks4": Socks4Client,
+    "ssudp": SSUDPClient,
 }

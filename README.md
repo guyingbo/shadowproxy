@@ -18,6 +18,47 @@ This project is inspired by qwj's python-proxy project(https://github.com/qwj/py
 
 It is a replacement of shadowsocks and shadowsocks-libev, you can replace ss-redir, ss-tunnel, ss-server, ss-local with just one shadowproxy command.
 
+## Installation
+
+shadowproxy requires Python3.6+
+
+```
+pip install shadowproxy
+```
+
+## Features
+
+### supported protocols
+
+protocol | server | client | scheme
+--- | --- | --- | ---
+socks5 | ✓ | ✓ | socks://
+socks4 | ✓ | ✓ | socks4://
+ss | ✓ | ✓ | ss://
+ss aead | ✓ | ✓ | ss://
+http | ✓ | ✓ | httponly://
+http connect | ✓ | ✓ | http://
+transparent proxy | ✓ | | red://
+
+### supported plugins
+
+plugin | server | client
+--- | --- | ---
+http_simple | ✓ | ✓
+tls1.2_ticket_auth | ✓ |
+
+### supported ciphers
+
+* aes-256-cfb
+* aes-128-cfb
+* aes-192-cfb
+* chacha20
+* salsa20
+* rc4
+* aes-256-gcm
+* aes-192-gcm
+* aes-128-gcm
+
 ## Usage
 
 ```
@@ -57,43 +98,3 @@ shadowproxy -v tunneludp://:8527/?target=8.8.8.8:53&via=ssudp://aes-256-cfb:pass
 shadowproxy -v tproxyudp://:8527/?via=ssudp://aes-256-cfb:password@127.0.0.1:8888
 ```
 
-## Installation
-
-shadowproxy requires Python3.6+
-
-```
-pip install shadowproxy
-```
-
-## Features
-
-### supported protocols
-
-protocol | server | client | scheme
---- | --- | --- | ---
-socks5 | ✓ | ✓ | socks://
-socks4 | ✓ | ✓ | socks4://
-ss | ✓ | ✓ | ss://
-ss aead | ✓ | ✓ | ss://
-http | ✓ | ✓ | httponly://
-http connect(tunnel) | ✓ | ✓ | http://
-transparent proxy | ✓ | | red://
-
-### supported plugins
-
-plugin | server | client
---- | --- | ---
-http_simple | ✓ | ✓
-tls1.2_ticket_auth | ✓ |
-
-### supported ciphers
-
-* aes-256-cfb
-* aes-128-cfb
-* aes-192-cfb
-* chacha20
-* salsa20
-* rc4
-* aes-256-gcm
-* aes-192-gcm
-* aes-128-gcm

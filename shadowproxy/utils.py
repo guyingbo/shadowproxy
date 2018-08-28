@@ -1,3 +1,4 @@
+import types
 import curio
 import socket
 # import signal
@@ -118,3 +119,13 @@ def set_disposable_recv(sock, redundant):
             return redundant
 
         sock.recv = disposable_recv
+
+
+class ViaNamespace(types.SimpleNamespace):
+    @property
+    def bind_address(self):
+        return f"{self.bind_addr[0]}:{self.bind_addr[1]}"
+
+    def new(self):
+        return self.ClientClass(self)
+

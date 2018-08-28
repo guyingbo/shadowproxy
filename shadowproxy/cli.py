@@ -1,5 +1,4 @@
 import os
-import types
 import curio
 import base64
 import weakref
@@ -16,6 +15,7 @@ from .ciphers import ciphers
 from . import __version__, __doc__ as desc
 from .proxies import server_protos, via_protos
 from .plugins import plugins
+from .utils import ViaNamespace
 
 connections = weakref.WeakSet()
 
@@ -27,15 +27,6 @@ def TcpProtoFactory(cls, *args, **kwargs):
         return await handler(client, addr)
 
     return client_handler
-
-
-class ViaNamespace(types.SimpleNamespace):
-    @property
-    def bind_address(self):
-        return f"{self.bind_addr[0]}:{self.bind_addr[1]}"
-
-    def new(self):
-        return self.ClientClass(self)
 
 
 def get_server(uri, is_via=False):
@@ -80,7 +71,7 @@ def get_server(uri, is_via=False):
                 "destitation must be assign in tunnel udp mode, "
                 "example tunneludp://:53/?target=8.8.8.8:53"
             )
-        host, _, port = qs["target"].partition(":")
+        host, _, port = qs["target"][0].partition(":")
         kwargs["target_addr"] = (host, int(port))
     if "plugin" in qs:
         plugin_info = qs["plugin"][0]
@@ -126,21 +117,26 @@ async def multi_server(*servers):
         gvars.logger.debug(f'ss -o "( {ss_filter} )"')
 
 
-async def udp_server_socket(host, port, *, family=socket.AF_INET, reuse_address=True):
+def udp_server_socket(host, port, *, family=socket.AF_INET, reuse_address=True):
     sock = socket.socket(family, socket.SOCK_DGRAM)
     try:
-        sock.bind((host, port))
         if reuse_address:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+        sock.bind((host, port))
         return sock
     except Exception:
-        await sock.close()
+        sock._socket.close()
         raise
 
 
 async def run_udp_server(sock, handler_task):
-    async with sock:
-        await handler_task(sock)
+    try:
+        async with sock:
+            await handler_task(sock)
+    except curio.errors.TaskCancelled:
+        pass
+    except Exception as e:
+        gvars.logger.exception(f"error {e}")
 
 
 def main():
