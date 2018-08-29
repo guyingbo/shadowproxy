@@ -1,6 +1,7 @@
 import types
 import curio
 import socket
+
 # import signal
 import ipaddress
 from . import gvars
@@ -29,7 +30,7 @@ def is_local(host: str) -> bool:
     return any(address in nw for nw in local_networks)
 
 
-def pack_bytes(data: bytes, length: int=1) -> bytes:
+def pack_bytes(data: bytes, length: int = 1) -> bytes:
     return len(data).to_bytes(length, "big") + data
 
 
@@ -46,20 +47,20 @@ def pack_addr(addr) -> bytes:
     return packed + port.to_bytes(2, "big")
 
 
-def unpack_addr(data: bytes, start: int = 0):
-    atyp = data[start]
+def unpack_addr(data: bytes):
+    atyp = data[0]
     if atyp == 1:  # IPV4
-        end = start + 5
-        ipv4 = data[start + 1 : end]
+        end = 5
+        ipv4 = data[1:end]
         host = socket.inet_ntoa(ipv4)
     elif atyp == 4:  # IPV6
-        end = start + 17
-        ipv6 = data[start:end]
+        end = 17
+        ipv6 = data[1:end]
         host = socket.inet_ntop(socket.AF_INET6, ipv6)
     elif atyp == 3:  # hostname
-        length = data[start + 1]
-        end = start + 2 + length
-        host = data[start + 2 : end].decode("ascii")
+        length = data[1]
+        end = 2 + length
+        host = data[2:end].decode("ascii")
     else:
         raise Exception(f"unknow atyp: {atyp}")
     port = int.from_bytes(data[end : end + 2], "big")
@@ -128,4 +129,3 @@ class ViaNamespace(types.SimpleNamespace):
 
     def new(self):
         return self.ClientClass(self)
-

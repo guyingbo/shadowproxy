@@ -6,6 +6,7 @@ import logging
 import argparse
 import resource
 import traceback
+import importlib
 from curio import ssl
 from curio import socket
 from curio.network import run_server
@@ -39,7 +40,14 @@ def get_server(uri, is_via=False):
         keyfile, _, certfile = url.fragment.partition(",")
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
-    proto = via_protos[url.scheme] if is_via else server_protos[url.scheme]
+    if "." in url.scheme:
+        path, class_name = url.scheme.rsplit(".", 1)
+        module = importlib.import_module(path)
+        start = len(path) + 1
+        class_name = uri[start: start + len(class_name)]
+        proto = getattr(module, class_name)
+    else:
+        proto = via_protos[url.scheme] if is_via else server_protos[url.scheme]
     userinfo, _, loc = url.netloc.rpartition("@")
     if userinfo:
         if ":" not in userinfo:

@@ -53,6 +53,9 @@ class ProxyBase(abc.ABC):
             f"{via_address} -- {self.target_address}"
         )
 
+    def __str__(self):
+        return repr(self)
+
     async def connect_server(self, target_addr):
         if self.via:
             via_client = self.via.new()
