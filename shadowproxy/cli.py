@@ -5,7 +5,6 @@ import weakref
 import logging
 import argparse
 import resource
-import traceback
 import importlib
 from curio import ssl
 from curio import socket
@@ -147,7 +146,7 @@ async def run_udp_server(sock, handler_task):
         gvars.logger.exception(f"error {e}")
 
 
-def main():
+def main(arguments=None):
     parser = argparse.ArgumentParser(
         description=desc, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -158,7 +157,7 @@ def main():
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
     parser.add_argument("server", nargs="+", type=get_server)
-    args = parser.parse_args()
+    args = parser.parse_args(arguments)
     if args.verbose == 0:
         level = logging.ERROR
     elif args.verbose == 1:
@@ -174,9 +173,7 @@ def main():
     try:
         kernel.run(multi_server(*args.server))
     except Exception as e:
-        traceback.print_exc()
-        for conn in connections:
-            gvars.logger.debug(f"| {conn}")
+        gvars.logger.exception(str(e))
     except KeyboardInterrupt:
         kernel.run(shutdown=True)
 

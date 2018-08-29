@@ -1,6 +1,5 @@
 import pytest
 from ipaddress import ip_address
-from shadowproxy.cli import get_client
 from shadowproxy.utils import is_local, pack_addr, unpack_addr, human_speed, human_bytes
 
 
@@ -36,8 +35,3 @@ def test_human_speed():
     assert human_speed(10) == "10 B/s"
     assert human_speed(1024) == "1.0 KB/s"
     assert human_speed(1024 * 1024 + 1) == "1.0 MB/s"
-
-
-def test_get_client():
-    ns = get_client("shadowproxy.proxies.socks.client.SocksClient://:0")
-    assert "SocksClient" == ns.__class__.__name__
