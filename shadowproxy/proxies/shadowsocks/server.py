@@ -13,18 +13,11 @@ class SSProxy(ProxyBase):
         self.ss_parser = ss_reader.parser(self.cipher)
 
     async def _run(self):
-        if hasattr(self.plugin, "make_recv_func"):
-            self._recv = self.plugin.make_recv_func(self.client)
-        else:
-            self._recv = self.client.recv
-
         addr_parser = addr_reader.parser()
         while True:
-            data = await self._recv(gvars.PACKET_SIZE)
+            data = await self.recv(gvars.PACKET_SIZE)
             if not data:
                 break
-            self.ss_parser.send(data)
-            data = self.ss_parser.read()
             addr_parser.send(data)
             if addr_parser.has_result:
                 break
@@ -38,9 +31,13 @@ class SSProxy(ProxyBase):
             await self.relay(via_client)
 
     async def recv(self, size):
-        data = await self._recv(size)
+        data = await self.client.recv(size)
         if not data:
             return data
+        if hasattr(self.plugin, "decode"):
+            data = self.plugin.decode(data)
+            if not data:
+                return await self.recv(size)
         self.ss_parser.send(data)
         return self.ss_parser.read()
 

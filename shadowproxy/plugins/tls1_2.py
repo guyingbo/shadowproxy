@@ -24,10 +24,9 @@ class TLS1_2Plugin(Plugin):
         self.tls_version = b"\x03\x03"
         self.hosts = (b"cloudfront.net", b"cloudfront.com")
         self.time_tolerance = 5 * 60
-        self.ticket_buf = {}
-        self.response_parser = tls1_2_response.parser(self)
 
     async def init_server(self, client):
+        self.response_parser = application_data.parser(self)
         tls_parser = tls1_2_request.parser(self)
         hello_sent = False
         while True:
@@ -77,6 +76,8 @@ class TLS1_2Plugin(Plugin):
         return ret
 
     async def init_client(self, client):
+        self.ticket_buf = {}
+        self.response_parser = tls1_2_response.parser(self)
         self.session_id = os.urandom(32)
         data = (
             self.tls_version
