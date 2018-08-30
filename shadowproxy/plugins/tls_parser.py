@@ -96,11 +96,7 @@ def tls1_2_request(plugin):
     cipher_suites = tail[:2].tobytes()
     compression_methods = tail[2:3]
     (cipher_suites, compression_methods)
-    utc_time = int(time()) & 0xFFFFFFFF
-    random_bytes = utc_time.to_bytes(4, "big") + os.urandom(18)
-    random_bytes += hmac.new(
-        plugin.proxy.cipher.master_key + session_id, random_bytes, hashlib.sha1
-    ).digest()[:10]
+    random_bytes = pack_auth_data(plugin.proxy.cipher.master_key, session_id)
     server_hello = (
         tls_version
         + random_bytes

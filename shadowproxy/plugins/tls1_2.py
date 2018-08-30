@@ -45,21 +45,6 @@ class TLS1_2Plugin(Plugin):
         redundant = tls_parser.readall()
         set_disposable_recv(client, redundant)
 
-    def make_recv_func(self, client):
-        data_parser = application_data.parser(self)
-
-        async def recv(size):
-            while True:
-                data = await client.recv(size)
-                if not data:
-                    return data
-                data_parser.send(data)
-                data = data_parser.read()
-                if data:
-                    return data
-
-        return recv
-
     def decode(self, data):
         self.response_parser.send(data)
         return self.response_parser.read()

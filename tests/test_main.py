@@ -1,6 +1,15 @@
+import curio
+import socket
 import pytest
 from ipaddress import ip_address
-from shadowproxy.utils import is_local, pack_addr, unpack_addr, human_speed, human_bytes
+from shadowproxy.utils import (
+    is_local,
+    pack_addr,
+    unpack_addr,
+    human_speed,
+    human_bytes,
+    open_connection,
+)
 
 
 def test_is_local():
@@ -35,3 +44,8 @@ def test_human_speed():
     assert human_speed(10) == "10 B/s"
     assert human_speed(1024) == "1.0 KB/s"
     assert human_speed(1024 * 1024 + 1) == "1.0 MB/s"
+
+
+def test_open_connection():
+    with pytest.raises(socket.gaierror):
+        curio.run(open_connection("does-not-exists.com", 80))
