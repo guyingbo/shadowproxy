@@ -1,12 +1,20 @@
+import os
+import hmac
+import struct
 import random
+import hashlib
+import binascii
 from .. import gvars
 from .base import Plugin
-from .tls_parser import tls1_2_request, application_data
+from .tls_parser import (
+    tls1_2_request,
+    application_data,
+    pack_auth_data,
+    sni,
+    pack_uint16,
+    tls1_2_response,
+)
 from ..utils import set_disposable_recv
-
-
-def pack_uint16(s):
-    return len(s).to_bytes(2, "big") + s
 
 
 class TLS1_2Plugin(Plugin):
@@ -16,6 +24,8 @@ class TLS1_2Plugin(Plugin):
         self.tls_version = b"\x03\x03"
         self.hosts = (b"cloudfront.net", b"cloudfront.com")
         self.time_tolerance = 5 * 60
+        self.ticket_buf = {}
+        self.response_parser = tls1_2_response.parser(self)
 
     async def init_server(self, client):
         tls_parser = tls1_2_request.parser(self)
@@ -31,11 +41,9 @@ class TLS1_2Plugin(Plugin):
                     continue
                 await client.sendall(server_hello)
                 hello_sent = True
-            else:
-                if not tls_parser.has_result:
-                    continue
+            if tls_parser.has_result:
                 break
-        redundant = tls_parser.input.read()
+        redundant = tls_parser.readall()
         set_disposable_recv(client, redundant)
 
     def make_recv_func(self, client):
@@ -53,6 +61,10 @@ class TLS1_2Plugin(Plugin):
 
         return recv
 
+    def decode(self, data):
+        self.response_parser.send(data)
+        return self.response_parser.read()
+
     def encode(self, data):
         ret = b""
         data = memoryview(data)
@@ -65,4 +77,44 @@ class TLS1_2Plugin(Plugin):
         return ret
 
     async def init_client(self, client):
-        ""
+        self.session_id = os.urandom(32)
+        data = (
+            self.tls_version
+            + pack_auth_data(client.ns.cipher.master_key, self.session_id)
+            + b"\x20"
+            + self.session_id
+        )
+        data += binascii.unhexlify(
+            b"001cc02bc02fcca9cca8cc14cc13c00ac014c009c013009c0035002f000a" + b"0100"
+        )
+        ext = binascii.unhexlify(b"ff01000100")
+        host = random.choice(self.hosts)
+        ext += sni(host)
+        ext += b"\x00\x17\x00\x00"
+        if host not in self.ticket_buf:
+            self.ticket_buf[host] = os.urandom(
+                (struct.unpack(">H", os.urandom(2))[0] % 17 + 8) * 16
+            )
+        ext += (
+            b"\x00\x23"
+            + struct.pack(">H", len(self.ticket_buf[host]))
+            + self.ticket_buf[host]
+        )
+        ext += binascii.unhexlify(
+            b"000d001600140601060305010503040104030301030302010203"
+        )
+        ext += binascii.unhexlify(b"000500050100000000")
+        ext += binascii.unhexlify(b"00120000")
+        ext += binascii.unhexlify(b"75500000")
+        ext += binascii.unhexlify(b"000b00020100")
+        ext += binascii.unhexlify(b"000a0006000400170018")
+        data += pack_uint16(ext)
+        data = b"\x01\x00" + pack_uint16(data)
+        data = b"\x16\x03\x01" + pack_uint16(data)
+        await client.sock.sendall(data)
+        data = b"\x14" + self.tls_version + b"\x00\x01\x01"
+        data += b"\x16" + self.tls_version + b"\x00\x20" + os.urandom(22)
+        data += hmac.new(
+            self.proxy.ns.cipher.master_key + self.session_id, data, hashlib.sha1
+        ).digest()[:10]
+        await client.sock.sendall(data)

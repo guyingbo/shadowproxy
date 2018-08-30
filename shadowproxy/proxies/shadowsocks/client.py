@@ -8,17 +8,19 @@ class SSClient(ClientBase):
         self.ss_parser = ss_reader.parser(self.ns.cipher)
 
     async def init(self):
-        plugin = getattr(self.ns, "plugin", None)
-        if plugin:
-            await plugin.init_client(self)
-        iv, self.encrypt = self.ns.cipher.make_encrypter()
-        data = iv + self.encrypt(pack_addr(self.target_addr))
-        await self.sock.sendall(data)
+        self.plugin = getattr(self.ns, "plugin", None)
+        if self.plugin:
+            self.plugin.proxy = self
+            await self.plugin.init_client(self)
 
     async def recv(self, size):
         data = await self.sock.recv(size)
         if not data:
             return data
+        if self.plugin and hasattr(self.plugin, "decode"):
+            data = self.plugin.decode(data)
+            if not data:
+                return await self.recv(size)
         self.ss_parser.send(data)
         data = self.ss_parser.read()
         if not data:
@@ -26,5 +28,12 @@ class SSClient(ClientBase):
         return data
 
     async def sendall(self, data):
-        data = self.encrypt(data)
-        await self.sock.sendall(data)
+        to_send = b""
+        if not hasattr(self, "encrypt"):
+            iv, self.encrypt = self.ns.cipher.make_encrypter()
+            to_send = iv + self.encrypt(pack_addr(self.target_addr))
+        to_send += self.encrypt(data)
+        plugin = getattr(self.ns, "plugin", None)
+        if plugin and hasattr(plugin, "encode"):
+            to_send = plugin.encode(to_send)
+        await self.sock.sendall(to_send)

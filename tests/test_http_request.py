@@ -8,7 +8,7 @@ gvars.logger.setLevel(10)
 async def make_request(client):
     headers = ["User-Agent: curl/7.54.0", "Accept: */*"]
     async with client:
-        async with curio.timeout_after(60):
+        async with curio.timeout_after(20):
             response = await client.http_request(
                 "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js", headers=headers
             )
@@ -72,6 +72,13 @@ def test_ss_http_simple():
     )
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
     client = get_client(f"ss://chacha20:123456@{bind_address}/?plugin=http_simple")
+    curio.run(main(client, server))
+
+
+def test_ss_over_tls():
+    server, bind_addr, _ = get_server("ss://chacha20:1@127.0.0.1:0/?plugin=tls1.2")
+    bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    client = get_client(f"ss://chacha20:1@{bind_address}/?plugin=tls1.2")
     curio.run(main(client, server))
 
 
