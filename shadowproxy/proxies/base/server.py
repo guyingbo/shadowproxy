@@ -47,14 +47,14 @@ class ProxyBase(abc.ABC):
         return f"{addr[0]}:{addr[1]}"
 
     def __repr__(self):
+        return f"{self.__class__.__name__}({self})"
+
+    def __str__(self):
         via_address = f" -- {self.via_address}" if self.via_address else ""
         return (
             f"{self.client_address} -- {self.proto} -- {self.bind_address}"
             f"{via_address} -- {self.target_address}"
         )
-
-    def __str__(self):
-        return repr(self)
 
     async def connect_server(self, target_addr):
         if self.via:

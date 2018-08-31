@@ -40,7 +40,7 @@ class ClientBase(abc.ABC):
             self._init()
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.bind_address})"
+        return f"{self.__class__.__name__}({self})"
 
     def __str__(self):
         return f"{self.bind_address} -- {self.target_address}"

@@ -47,7 +47,7 @@ ss(udp) | ✓ | ✓ | ssudp://
 plugin | server | client
 --- | --- | ---
 http_simple | ✓ | ✓
-tls1.2_ticket_auth | ✓ |
+tls1.2_ticket_auth | ✓ | ✓
 
 ### supported ciphers
 
