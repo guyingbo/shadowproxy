@@ -13,6 +13,11 @@ class SSProxy(ProxyBase):
         self.ss_parser = ss_reader.parser(self.cipher)
 
     async def _run(self):
+        if self.plugin:
+            self.plugin.server = self
+            self.proto += f"({self.plugin.name})"
+            await self.plugin.init_server(self.client)
+
         addr_parser = addr_reader.parser()
         while True:
             data = await self.recv(gvars.PACKET_SIZE)

@@ -101,6 +101,6 @@ class TLS1_2Plugin(Plugin):
         data = b"\x14" + self.tls_version + b"\x00\x01\x01"
         data += b"\x16" + self.tls_version + b"\x00\x20" + os.urandom(22)
         data += hmac.new(
-            self.proxy.ns.cipher.master_key + self.session_id, data, hashlib.sha1
+            self.client.ns.cipher.master_key + self.session_id, data, hashlib.sha1
         ).digest()[:10]
         await client.sock.sendall(data)

@@ -39,7 +39,7 @@ def tls1_2_response(plugin):
     assert server_hello[:2] == tls_version, "expect: server_version(3.3)"
     verify_id = server_hello[2:34]
     sha1 = hmac.new(
-        plugin.proxy.ns.cipher.master_key + plugin.session_id,
+        plugin.client.ns.cipher.master_key + plugin.session_id,
         verify_id[:-10],
         hashlib.sha1,
     ).digest()[:10]
@@ -47,7 +47,7 @@ def tls1_2_response(plugin):
     assert server_hello[34] == 32, f"expect 32, but got {server_hello[34]}"
     # verify_id = server_hello[35:67]
     # sha1 = hmac.new(
-    #     plugin.proxy.ns.cipher.master_key + plugin.session_id,
+    #     plugin.client.ns.cipher.master_key + plugin.session_id,
     #     fragment[:-10],
     #     hashlib.sha1,
     # ).digest()[:10]
@@ -61,7 +61,7 @@ def tls1_2_response(plugin):
         assert length == length & 0x3FFF, f"{length} is over 2^14"
         yield from iofree.read(length)
     yield from ChangeCipherReader(
-        plugin, plugin.proxy.ns.cipher.master_key, plugin.session_id
+        plugin, plugin.client.ns.cipher.master_key, plugin.session_id
     )
     yield from application_data(plugin)
 
@@ -89,14 +89,14 @@ def tls1_2_request(plugin):
     assert session_length >= 32, "session length should be >= 32"
     session_id = client_hello[35 : 35 + session_length].tobytes()
     sha1 = hmac.new(
-        plugin.proxy.cipher.master_key + session_id, verify_id[:22], hashlib.sha1
+        plugin.server.cipher.master_key + session_id, verify_id[:22], hashlib.sha1
     ).digest()[:10]
     assert verify_id[22:] == sha1, "hmac verify failed"
     tail = client_hello[35 + session_length :]
     cipher_suites = tail[:2].tobytes()
     compression_methods = tail[2:3]
     (cipher_suites, compression_methods)
-    random_bytes = pack_auth_data(plugin.proxy.cipher.master_key, session_id)
+    random_bytes = pack_auth_data(plugin.server.cipher.master_key, session_id)
     server_hello = (
         tls_version
         + random_bytes
@@ -119,10 +119,10 @@ def tls1_2_request(plugin):
         + os.urandom(finish_len - 10)
     )
     change_cipher_spec += hmac.new(
-        plugin.proxy.cipher.master_key + session_id, change_cipher_spec, hashlib.sha1
+        plugin.server.cipher.master_key + session_id, change_cipher_spec, hashlib.sha1
     ).digest()[:10]
     yield from iofree.write(server_hello + change_cipher_spec)
-    yield from ChangeCipherReader(plugin, plugin.proxy.cipher.master_key, session_id)
+    yield from ChangeCipherReader(plugin, plugin.server.cipher.master_key, session_id)
 
 
 def ChangeCipherReader(plugin, key, session_id):

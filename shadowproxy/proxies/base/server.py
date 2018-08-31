@@ -8,7 +8,6 @@ class ProxyBase(abc.ABC):
     target_addr = ("unknown", -1)
     client = None
     via = None
-    plugin = None
 
     @property
     @abc.abstractmethod
@@ -71,10 +70,6 @@ class ProxyBase(abc.ABC):
         self.client_addr = addr
         try:
             async with client:
-                if self.plugin:
-                    self.plugin.proxy = self
-                    self.proto += f"({self.plugin.name})"
-                    await self.plugin.init_server(client)
                 await self._run()
         except curio.errors.TaskCancelled:
             pass

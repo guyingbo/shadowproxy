@@ -36,8 +36,6 @@ class ClientBase(abc.ABC):
 
     def __init__(self, namespace):
         self.ns = namespace
-        if hasattr(self, "_init"):
-            self._init()
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self})"

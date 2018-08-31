@@ -4,13 +4,11 @@ from .parser import ss_reader
 
 
 class SSClient(ClientBase):
-    def _init(self):
-        self.ss_parser = ss_reader.parser(self.ns.cipher)
-
     async def init(self):
+        self.ss_parser = ss_reader.parser(self.ns.cipher)
         self.plugin = getattr(self.ns, "plugin", None)
         if self.plugin:
-            self.plugin.proxy = self
+            self.plugin.client = self
             await self.plugin.init_client(self)
 
     async def recv(self, size):
