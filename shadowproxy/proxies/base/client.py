@@ -44,13 +44,10 @@ class ClientBase(abc.ABC):
         return f"{self.bind_address} -- {self.target_address}"
 
     async def __aenter__(self):
-        if self.sock:
-            await self.sock.__aenter__()
         return self
 
     async def __aexit__(self, et, e, tb):
-        if self.sock:
-            await self.sock.__aexit__(et, e, tb)
+        await self.close()
 
     async def close(self):
         if self.sock:

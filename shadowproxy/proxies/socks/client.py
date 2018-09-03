@@ -8,8 +8,6 @@ from ...utils import set_disposable_recv, pack_bytes
 
 
 class SocksClient(ClientBase):
-    name = "socks"
-
     async def init(self):
         auth = getattr(self.ns, "auth", None)
         if auth:

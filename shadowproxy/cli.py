@@ -20,18 +20,24 @@ from .utils import ViaNamespace
 connections = weakref.WeakSet()
 
 
-def TcpProtoFactory(cls, *args, **kwargs):
+def TcpProtoFactory(cls, **kwargs):
     async def client_handler(client, addr):
-        handler = cls(*args, **kwargs)
+        handler = cls(**kwargs)
         connections.add(handler)
         return await handler(client, addr)
 
     return client_handler
 
 
-def get_server(uri, is_via=False):
-    url = parse.urlparse(uri)
-    kwargs = {}
+def get_custom_proto(url, uri):
+    path, class_name = url.scheme.rsplit(".", 1)
+    module = importlib.import_module(path)
+    start = len(path) + 1
+    class_name = uri[start : start + len(class_name)]
+    return getattr(module, class_name)
+
+
+def get_ssl(url):
     ssl_context = None
     if url.scheme in ("https",):
         if not url.fragment:
@@ -39,12 +45,14 @@ def get_server(uri, is_via=False):
         keyfile, _, certfile = url.fragment.partition(",")
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
+    return ssl_context
+
+
+def get_server(uri, is_via=False):
+    url = parse.urlparse(uri)
+    kwargs = {}
     if "." in url.scheme:
-        path, class_name = url.scheme.rsplit(".", 1)
-        module = importlib.import_module(path)
-        start = len(path) + 1
-        class_name = uri[start: start + len(class_name)]
-        proto = getattr(module, class_name)
+        proto = get_custom_proto(url, uri)
     else:
         proto = via_protos[url.scheme] if is_via else server_protos[url.scheme]
     userinfo, _, loc = url.netloc.rpartition("@")
@@ -65,12 +73,14 @@ def get_server(uri, is_via=False):
     if loc:
         host, _, port = loc.partition(":")
         if not port:
-            port = gvars.default_ports[url.scheme]
+            port = gvars.default_ports.get(url.scheme, gvars.default_port)
         else:
             port = int(port)
         bind_addr = (host, port)
     else:
-        raise Exception("You must specify a port")
+        bind_addr = ("", gvars.default_port)
+    if url.path not in ("", "/"):
+        kwargs["path"] = url.path
     qs = parse.parse_qs(url.query)
     if url.scheme == "tunneludp":
         if "target" not in qs:
@@ -98,7 +108,7 @@ def get_server(uri, is_via=False):
         server_sock = curio.tcp_server_socket(*bind_addr, backlog=1024)
         bind_addr = server_sock._socket.getsockname()
         server = run_server(
-            server_sock, TcpProtoFactory(proto, **kwargs), ssl=ssl_context
+            server_sock, TcpProtoFactory(proto, **kwargs), ssl=get_ssl(url)
         )
     return server, bind_addr, url.scheme
 
