@@ -1,6 +1,6 @@
 # 在 nat 表中创建新链
 iptables -t nat -N shadowsocks
-iptables -t nat -A shadowsocks -d 1.1.1.1 -j RETURN
+# iptables -t nat -A shadowsocks -d {your_ip} -j RETURN
 
 iptables -t nat -A shadowsocks -d 0.0.0.0/8 -j RETURN
 iptables -t nat -A shadowsocks -d 10.0.0.0/8 -j RETURN
