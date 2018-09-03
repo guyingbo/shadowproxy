@@ -1,9 +1,10 @@
 language: python
+dist: trusty
 sudo: required
 python:
   - 3.6
 before_install:
-  - sh iptables_redir.sh
+  - sudo sh iptables_redir.sh
 install:
   - python setup.py install
   - pip install codecov
