@@ -6,9 +6,10 @@ from .parser import AEADProtocol
 class AEADClient(ClientBase):
     async def init(self):
         self.aead_parser = AEADProtocol(self.ns.cipher).parser()
-        plugin = getattr(self.ns, "plugin", None)
-        if plugin:
-            await plugin.init_client(self)
+        self.plugin = getattr(self.ns, "plugin", None)
+        if self.plugin:
+            self.plugin.client = self
+            await self.plugin.init_client(self)
         salt, self.encrypt = self.ns.cipher.make_encrypter()
         data = pack_addr(self.target_addr)
         len_data = len(data).to_bytes(2, "big")
@@ -19,6 +20,10 @@ class AEADClient(ClientBase):
         data = await self.sock.recv(size)
         if not data:
             return data
+        if self.plugin and hasattr(self.plugin, "decode"):
+            data = self.plugin.decode(data)
+            if not data:
+                return await self.recv(size)
         self.aead_parser.send(data)
         data = self.aead_parser.read()
         if not data:
