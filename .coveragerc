@@ -6,4 +6,4 @@ include =
     shadowproxy/*.py
     tests/*.py
 omit =
-    shadowproxy/proxies/transparent/*.py
+    shadowproxy/proxies/transparent/udpserver.py

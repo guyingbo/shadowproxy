@@ -7,7 +7,7 @@ from shadowproxy.cli import get_server, get_client, main
 
 def test_cli():
     with pytest.raises(argparse.ArgumentTypeError):
-        get_server("https://")
+        get_server("ss://")
 
 
 def test_get_client():
