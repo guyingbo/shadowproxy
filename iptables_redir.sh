@@ -12,5 +12,6 @@ iptables -t nat -A shadowsocks -d 224.0.0.0/4 -j RETURN
 iptables -t nat -A shadowsocks -d 240.0.0.0/4 -j RETURN
 iptables -t nat -A shadowsocks -p tcp -j REDIRECT --to-ports 12345
 # 12345 是 shadowsocks 的默认监听端口
-iptables -t nat -I PREROUTING -p tcp -j shadowsocks
+iptables -t nat -I PREROUTING -p tcp -d 1.1.1.1/32 -j shadowsocks
+# iptables -t nat -I PREROUTING -p tcp -j shadowsocks
 # 在 PREROUTING 链前插入 shadowsocks 链,使其生效

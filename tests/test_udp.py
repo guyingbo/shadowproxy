@@ -9,7 +9,7 @@ gvars.logger.setLevel(10)
 async def make_request(bind_addr):
     async with curio.timeout_after(60):
         r = await subprocess.run(
-            ["dig", f"@{bind_addr[0]}", "-p", f"{bind_addr[1]}", "baidu.com"]
+            ["dig", "+short", f"@{bind_addr[0]}", "-p", f"{bind_addr[1]}", "baidu.com"]
         )
         assert r.returncode == 0
 

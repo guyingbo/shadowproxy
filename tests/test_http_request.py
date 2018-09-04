@@ -13,7 +13,7 @@ async def make_request(client):
             response = await client.http_request(
                 "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js", headers=headers
             )
-            response.size == 264
+            assert response.size > 0
 
 
 async def main(coro, *server_coros):
@@ -91,7 +91,7 @@ def test_aead():
 
 
 async def job():
-    assert subprocess.run(["curl", "https://1.1.1.1/"]).returncode == 0
+    assert subprocess.run(["curl", "-I", "https://1.1.1.1/"]).returncode == 0
 
 
 def test_transparent():
