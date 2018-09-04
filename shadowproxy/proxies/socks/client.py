@@ -8,6 +8,8 @@ from ...utils import set_disposable_recv, pack_bytes
 
 
 class SocksClient(ClientBase):
+    proto = "SOCKS"
+
     async def init(self):
         auth = getattr(self.ns, "auth", None)
         if auth:
@@ -32,6 +34,8 @@ class SocksClient(ClientBase):
 
 
 class Socks4Client(ClientBase):
+    proto = "SOCKS4"
+
     async def init(self):
         response_parser = socks4_response.parser()
         info = await socket.getaddrinfo(

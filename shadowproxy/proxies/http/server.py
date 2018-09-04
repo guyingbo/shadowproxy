@@ -6,7 +6,7 @@ from .parser import http_request
 
 
 class HTTPProxy(ProxyBase):
-    proto = "HTTP"
+    proto = "HTTP(ONLY)"
 
     def __init__(self, auth=None, via=None):
         self.auth = auth

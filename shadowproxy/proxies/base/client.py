@@ -55,6 +55,11 @@ class ClientBase(abc.ABC):
             self.sock = None
 
     @property
+    @abc.abstractmethod
+    def proto(self):
+        ""
+
+    @property
     def bind_address(self) -> str:
         return f"{self.ns.bind_addr[0]}:{self.ns.bind_addr[1]}"
 

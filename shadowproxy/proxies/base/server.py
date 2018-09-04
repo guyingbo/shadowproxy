@@ -28,6 +28,8 @@ class ProxyBase(abc.ABC):
 
     @property
     def via_address(self) -> str:
+        if hasattr(self, "_via_address"):
+            return self._via_address
         if getattr(self, "via", None):
             return self.via.bind_address
         return ""
@@ -58,6 +60,7 @@ class ProxyBase(abc.ABC):
     async def connect_server(self, target_addr):
         if self.via:
             via_client = self.via.new()
+            self._via_address = f"{via_client.proto} -- {via_client.bind_address}"
             await via_client.connect(target_addr)
             await via_client.init()
         else:

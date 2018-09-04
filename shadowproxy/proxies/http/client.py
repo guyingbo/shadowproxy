@@ -6,6 +6,8 @@ from .parser import http_response
 
 
 class HTTPOnlyClient(ClientBase):
+    proto = "HTTP(ONLY)"
+
     async def init(self):
         ""
 
@@ -25,6 +27,8 @@ class HTTPOnlyClient(ClientBase):
 
 
 class HTTPClient(ClientBase):
+    proto = "HTTP(CONNECT)"
+
     async def init(self):
         headers_str = (
             f"CONNECT {self.target_address} HTTP/1.1\r\n"

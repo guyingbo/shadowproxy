@@ -4,6 +4,8 @@ from .parser import AEADProtocol
 
 
 class AEADClient(ClientBase):
+    proto = "AEAD"
+
     async def init(self):
         self.aead_parser = AEADProtocol(self.ns.cipher).parser()
         self.plugin = getattr(self.ns, "plugin", None)

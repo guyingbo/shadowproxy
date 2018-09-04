@@ -90,12 +90,12 @@ def test_aead():
     curio.run(main(make_request(client), server))
 
 
+async def job():
+    assert subprocess.run(["curl", "https://1.1.1.1/"]).returncode == 0
+
+
 def test_transparent():
-    server, bind_addr, _ = get_server("red://:12345")
-
-    async def job():
-        assert subprocess.run(["curl", "https://1.1.1.1/"]).returncode == 0
-
+    server, bind_addr, _ = get_server("red://0.0.0.0:12345")
     curio.run(main(job, server))
 
 
