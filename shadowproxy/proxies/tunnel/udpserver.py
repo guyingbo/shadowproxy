@@ -2,9 +2,10 @@ import pylru
 from ... import gvars
 from ...utils import ViaNamespace
 from ..base.udpclient import UDPClient
+from ..base.udpserver import UDPServerBase
 
 
-class TunnelUDPServer:
+class TunnelUDPServer(UDPServerBase):
     proto = "TUNNEL(UDP)"
 
     def __init__(self, target_addr, via=None):
@@ -28,10 +29,11 @@ class TunnelUDPServer:
                     self.removed = None
             via_client = self.via_clients[addr]
 
-            async def sendto_from(data, from_addr):
+            async def sendfrom(data, from_addr):
                 await sock.sendto(data, addr)
 
             await via_client.sendto(data, self.target_addr)
-            await via_client.relay(self.target_addr, sendto_from)
+            await via_client.relay(self.target_addr, sendfrom)
+
         for via_client in self.via_clients.values():
             await via_client.close()

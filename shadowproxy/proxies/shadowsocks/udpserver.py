@@ -2,9 +2,10 @@ import pylru
 from ... import gvars
 from ...utils import pack_addr, unpack_addr, ViaNamespace
 from ..base.udpclient import UDPClient
+from ..base.udpserver import UDPServerBase
 
 
-class SSUDPServer:
+class SSUDPServer(UDPServerBase):
     proto = "SS(UDP)"
 
     def __init__(self, cipher, via=None):
@@ -42,3 +43,6 @@ class SSUDPServer:
                 await sock.sendto(iv + payload, addr)
 
             await via_client.relay(target_addr, sendfrom)
+
+        for via_client in self.via_clients.values():
+            await via_client.close()

@@ -97,6 +97,7 @@ def get_server(uri, is_via=False):
         kwargs["plugin"] = plugins[plugin_name](*args)
     if is_via:
         kwargs["bind_addr"] = bind_addr
+        kwargs["uri"] = uri
         return ViaNamespace(ClientClass=proto, **kwargs)
     elif "via" in qs:
         kwargs["via"] = get_server(qs["via"][0], True)
