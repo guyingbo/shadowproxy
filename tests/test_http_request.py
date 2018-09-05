@@ -6,13 +6,13 @@ from shadowproxy.cli import get_server, get_client
 gvars.logger.setLevel(10)
 
 
-async def make_request(client):
+async def make_request(client, url=None):
+    if url is None:
+        url = "https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
     headers = ["User-Agent: curl/7.54.0", "Accept: */*"]
     async with client:
         async with curio.timeout_after(20):
-            response = await client.http_request(
-                "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js", headers=headers
-            )
+            response = await client.http_request(url, headers=headers)
             assert response.size > 0
 
 
@@ -36,7 +36,8 @@ def test_http_only():
     server, bind_addr, _ = get_server("http://user:password@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
     client = get_client(f"httponly://user:password@{bind_address}")
-    curio.run(main(make_request(client), server))
+    url = "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+    curio.run(main(make_request(client, url), server))
 
 
 def test_socks5():
@@ -113,9 +114,7 @@ def test_via():
 def test_http_via():
     via_server, bind_addr, _ = get_server("http://:0")
     via_address = f"{bind_addr[0]}:{bind_addr[1]}"
-    server, bind_addr, _ = get_server(
-        f"http://127.0.0.1:0/?via=httponly://{via_address}"
-    )
+    server, bind_addr, _ = get_server(f"http://127.0.0.1:0/?via=http://{via_address}")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
-    client = get_client(f"httponly://{bind_address}")
+    client = get_client(f"http://{bind_address}")
     curio.run(main(make_request(client), server, via_server))

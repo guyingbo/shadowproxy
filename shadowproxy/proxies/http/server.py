@@ -6,7 +6,7 @@ from .parser import http_request
 
 
 class HTTPProxy(ProxyBase):
-    proto = "HTTP(ONLY)"
+    proto = "HTTP"
 
     def __init__(self, bind_addr, auth=None, via=None):
         self.bind_addr = bind_addr
@@ -39,6 +39,7 @@ class HTTPProxy(ProxyBase):
             host, _, port = ns.path.partition(b":")
             self.target_addr = (host.decode(), int(port))
         else:
+            self.proto = "HTTP(ONLY)"
             url = parse.urlparse(ns.path)
             if not url.hostname:
                 await self.client.sendall(
