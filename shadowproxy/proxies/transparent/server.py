@@ -9,7 +9,8 @@ SO_ORIGINAL_DST = 80
 class TransparentProxy(ProxyBase):
     proto = "REDIRECT"
 
-    def __init__(self, via=None, plugin=None):
+    def __init__(self, bind_addr, via=None, plugin=None):
+        self.bind_addr = bind_addr
         self.via = via
         self.plugin = plugin
 

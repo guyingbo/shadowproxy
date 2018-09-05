@@ -8,9 +8,11 @@ from .parser import http_request
 class HTTPProxy(ProxyBase):
     proto = "HTTP(ONLY)"
 
-    def __init__(self, auth=None, via=None):
+    def __init__(self, bind_addr, auth=None, via=None):
+        self.bind_addr = bind_addr
         self.auth = auth
         self.via = via
+        self.bind_addr = bind_addr
 
     async def _run(self):
         parser = http_request.parser()

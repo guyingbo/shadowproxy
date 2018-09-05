@@ -108,3 +108,14 @@ def test_via():
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
     client = get_client(f"socks://{bind_address}")
     curio.run(main(make_request(client), server, via_server))
+
+
+def test_http_via():
+    via_server, bind_addr, _ = get_server("http://:0")
+    via_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    server, bind_addr, _ = get_server(
+        f"http://127.0.0.1:0/?via=httponly://{via_address}"
+    )
+    bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    client = get_client(f"httponly://{bind_address}")
+    curio.run(main(make_request(client), server, via_server))

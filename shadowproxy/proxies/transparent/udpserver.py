@@ -14,7 +14,8 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 class TransparentUDPServer(UDPServerBase):
     proto = "RED(UDP)"
 
-    def __init__(self, via=None):
+    def __init__(self, bind_addr, via=None):
+        self.bind_addr = bind_addr
         self.via = via or ViaNamespace(ClientClass=UDPClient)
         self.removed = None
 

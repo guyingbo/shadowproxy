@@ -79,6 +79,7 @@ def get_server(uri, is_via=False):
         bind_addr = (host, port)
     else:
         bind_addr = ("", gvars.default_port)
+    kwargs["bind_addr"] = bind_addr
     if url.path not in ("", "/"):
         kwargs["path"] = url.path
     qs = parse.parse_qs(url.query)
@@ -96,7 +97,6 @@ def get_server(uri, is_via=False):
         args = [arg for arg in args.split(",") if arg]
         kwargs["plugin"] = plugins[plugin_name](*args)
     if is_via:
-        kwargs["bind_addr"] = bind_addr
         kwargs["uri"] = uri
         return ViaNamespace(ClientClass=proto, **kwargs)
     elif "via" in qs:

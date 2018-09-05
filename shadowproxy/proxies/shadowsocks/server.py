@@ -6,8 +6,9 @@ from .parser import addr_reader, ss_reader
 class SSProxy(ProxyBase):
     proto = "SS"
 
-    def __init__(self, cipher, via=None, plugin=None):
+    def __init__(self, cipher, bind_addr, via=None, plugin=None):
         self.cipher = cipher
+        self.bind_addr = bind_addr
         self.via = via
         self.plugin = plugin
         self.ss_parser = ss_reader.parser(self.cipher)

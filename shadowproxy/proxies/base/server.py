@@ -42,10 +42,7 @@ class ProxyBase(abc.ABC):
 
     @property
     def bind_address(self) -> str:
-        if self.client is None:
-            return ""
-        addr = self.client.getsockname()
-        return f"{addr[0]}:{addr[1]}"
+        return f"{self.bind_addr[0]}:{self.bind_addr[1]}"
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self})"
@@ -77,7 +74,7 @@ class ProxyBase(abc.ABC):
         except curio.errors.TaskCancelled:
             pass
         except Exception as e:
-            gvars.logger.exception(f"error: {e}")
+            gvars.logger.debug(f"{self} {e}")
 
     async def relay(self, via_client):
         try:

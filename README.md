@@ -8,7 +8,7 @@
 [![codecov](https://codecov.io/gh/guyingbo/shadowproxy/branch/master/graph/badge.svg)](https://codecov.io/gh/guyingbo/shadowproxy)
 
 
-## Intro
+## Introduction
 
 A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
 

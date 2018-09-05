@@ -7,7 +7,8 @@ from .parser import socks5_request, socks4_request
 class SocksProxy(ProxyBase):
     proto = "SOCKS"
 
-    def __init__(self, auth=None, via=None, plugin=None):
+    def __init__(self, bind_addr, auth=None, via=None, plugin=None):
+        self.bind_addr = bind_addr
         self.auth = auth
         self.via = via
         self.plugin = plugin
@@ -43,7 +44,8 @@ class SocksProxy(ProxyBase):
 class Socks4Proxy(ProxyBase):
     proto = "SOCKS4"
 
-    def __init__(self, auth=None, via=None, plugin=None):
+    def __init__(self, bind_addr, auth=None, via=None, plugin=None):
+        self.bind_addr = bind_addr
         self.auth = auth
         self.via = via
         self.plugin = plugin

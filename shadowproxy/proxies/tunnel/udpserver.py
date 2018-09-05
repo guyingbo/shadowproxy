@@ -8,8 +8,9 @@ from ..base.udpserver import UDPServerBase
 class TunnelUDPServer(UDPServerBase):
     proto = "TUNNEL(UDP)"
 
-    def __init__(self, target_addr, via=None):
+    def __init__(self, target_addr, bind_addr, via=None):
         self.target_addr = target_addr
+        self.bind_addr = bind_addr
         self.via = via or ViaNamespace(ClientClass=UDPClient)
         self.removed = None
 
