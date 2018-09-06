@@ -91,14 +91,14 @@ class ProxyBase(abc.ABC):
             try:
                 data = await recv(gvars.PACKET_SIZE)
             except (ConnectionResetError, BrokenPipeError) as e:
-                gvars.logger.debug(f"recv from {self.client_address} {e}")
+                gvars.logger.debug(f"{self} recv from {self.client_address} {e}")
                 return
             if not data:
                 break
             try:
                 await to.sendall(data)
             except (ConnectionResetError, BrokenPipeError) as e:
-                gvars.logger.debug(f"send to {self.remote_address} {e}")
+                gvars.logger.debug(f"{self} send to {self.remote_address} {e}")
                 return
 
     async def _reverse_relay(self, from_):
@@ -107,12 +107,12 @@ class ProxyBase(abc.ABC):
             try:
                 data = await from_.recv(gvars.PACKET_SIZE)
             except (ConnectionResetError, BrokenPipeError) as e:
-                gvars.logger.debug(f"recv from {self.remote_address} {e}")
+                gvars.logger.debug(f"{self} recv from {self.remote_address} {e}")
                 return
             if not data:
                 break
             try:
                 await sendall(data)
             except (ConnectionResetError, BrokenPipeError) as e:
-                gvars.logger.debug(f"send to {self.client_address} {e}")
+                gvars.logger.debug(f"{self} send to {self.client_address} {e}")
                 return

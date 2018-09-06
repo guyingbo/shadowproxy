@@ -5,7 +5,8 @@
 [![Version](https://img.shields.io/pypi/v/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
 [![Format](https://img.shields.io/pypi/format/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
 [![License](https://img.shields.io/pypi/l/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
-[![codecov](https://codecov.io/gh/guyingbo/shadowproxy/branch/master/graph/badge.svg)](https://codecov.io/gh/guyingbo/shadowproxy)
+[![Code Coverage](https://codecov.io/gh/guyingbo/shadowproxy/branch/master/graph/badge.svg)](https://codecov.io/gh/guyingbo/shadowproxy)
+[![Lines Of Code](https://tokei.rs/b1/github/guyingbo/shadowproxy?category=code)](https://github.com/guyingbo/shadowproxy)
 
 
 ## Introduction
