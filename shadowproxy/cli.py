@@ -157,6 +157,16 @@ async def run_udp_server(sock, handler_task):
         gvars.logger.exception(f"error {e}")
 
 
+def get_factory(factory_path):
+    path, class_name = factory_path.rsplit(".", 1)
+    module = importlib.import_module(path)
+    start = len(path) + 1
+    class_name = factory_path[start : start + len(class_name)]
+    factory = getattr(module, class_name)
+    globals()["TcpProtoFactory"] = factory
+    return module
+
+
 def main(arguments=None):
     parser = argparse.ArgumentParser(
         description=desc, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -166,6 +176,12 @@ def main(arguments=None):
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    parser.add_argument(
+        "--factory",
+        type=get_factory,
+        default=None,
+        help="replace default tcp factory, if exists, must be present before server",
     )
     parser.add_argument("server", nargs="+", type=get_server)
     args = parser.parse_args(arguments)

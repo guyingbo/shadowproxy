@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/pypi/l/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
 [![Code Coverage](https://codecov.io/gh/guyingbo/shadowproxy/branch/master/graph/badge.svg)](https://codecov.io/gh/guyingbo/shadowproxy)
 [![Lines Of Code](https://tokei.rs/b1/github/guyingbo/shadowproxy?category=code)](https://github.com/guyingbo/shadowproxy)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
 
 ## Introduction
