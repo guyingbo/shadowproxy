@@ -1,7 +1,7 @@
 version: 0.2
 run-as: ubuntu
 phases:
-  install:
+  pre_build:
     commands:
       - python -c "print('ok')"
       - python -m pip install -U pip
