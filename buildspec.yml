@@ -1,0 +1,10 @@
+version: 0.2
+run-as: ubuntu
+phases:
+  install:
+    commands:
+      - python -m pip install -U pip
+      - python -m pip install -U pex
+  build:
+    commands:
+      - pex -v -m shadowproxy . -o shadowproxy.pex
