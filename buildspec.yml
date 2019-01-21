@@ -3,6 +3,7 @@ run-as: ubuntu
 phases:
   install:
     commands:
+      - python -c "print('ok')"
       - python -m pip install -U pip
       - python -m pip install -U pex
   build:
