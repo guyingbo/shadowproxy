@@ -1,7 +1,4 @@
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup, find_namespace_packages
 import os.path
 import re
 
@@ -34,7 +31,7 @@ setup(
     maintainer="Yingbo Gu",
     maintainer_email="tensiongyb@gmail.com",
     url="https://github.com/guyingbo/shadowproxy",
-    packages=["shadowproxy"],
+    packages=find_namespace_packages(include=['shadowproxy*']),
     install_requires=[
         "pycryptodome>=3.4.3",
         "curio>=0.9",
@@ -43,7 +40,7 @@ setup(
         "iofree>=0.1.1",
         "httptools",
     ],
-    entry_points={"console_scripts": ["shadowproxy = shadowproxy.cli:main"]},
+    entry_points={"console_scripts": ["shadowproxy = shadowproxy.__main__:main"]},
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.6",
