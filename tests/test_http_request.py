@@ -1,7 +1,7 @@
 import curio
 import subprocess
 from shadowproxy import gvars
-from shadowproxy.cli import get_server, get_client
+from shadowproxy.__main__ import get_server, get_client
 
 gvars.logger.setLevel(10)
 

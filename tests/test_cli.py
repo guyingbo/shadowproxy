@@ -2,7 +2,7 @@ import os
 import signal
 import pytest
 import argparse
-from shadowproxy.cli import get_server, get_client, main
+from shadowproxy.__main__ import get_server, get_client, main
 
 
 def test_cli():
