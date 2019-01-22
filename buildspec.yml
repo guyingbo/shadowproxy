@@ -1,11 +1,13 @@
 version: 0.2
-run-as: ubuntu
 phases:
   pre_build:
     commands:
-      - python -c "print('ok')"
       - python -m pip install -U pip
       - python -m pip install -U pex
   build:
     commands:
       - pex -v -m shadowproxy . -o shadowproxy.pex
+artifacts:
+  files:
+    - shadowproxy.pex
+  discard-paths: yes
