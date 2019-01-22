@@ -1,7 +1,8 @@
 version: 0.2
 phases:
-  pre_build:
+  install:
     commands:
+      - apt-get install -y ca-certificates
       - python -m pip install -U pip
       - python -m pip install -U pex
   build:
