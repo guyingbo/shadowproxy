@@ -3,6 +3,7 @@ dist: xenial
 sudo: required
 python:
   - 3.6
+  - 3.7
 before_install:
   - sudo sh iptables_redir.sh
 install:
