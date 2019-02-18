@@ -26,16 +26,16 @@ def pack_auth_data(key, session_id):
 @iofree.parser
 def tls1_2_response(plugin):
     tls_version = plugin.tls_version
-    tls_plaintext_head = memoryview((yield from iofree.read(5)))
-    assert (
-        tls_plaintext_head[:3] == b"\x16\x03\x03"
-    ), "invalid tls head: handshake(22) protocol_version(3.1)"
-    length = int.from_bytes(tls_plaintext_head[-2:], "big")
+    with memoryview((yield from iofree.read(5))) as tls_plaintext_head:
+        assert (
+            tls_plaintext_head[:3] == b"\x16\x03\x03"
+        ), "invalid tls head: handshake(22) protocol_version(3.1)"
+        length = int.from_bytes(tls_plaintext_head[-2:], "big")
     assert length == length & 0x3FFF, f"{length} is over 2^14"
-    fragment = memoryview((yield from iofree.read(length)))
-    assert fragment[0] == 2, f"expect server_hello(2), bug got: {fragment[0]}"
-    handshake_length = int.from_bytes(fragment[1:4], "big")
-    server_hello = fragment[4 : handshake_length + 4]
+    with memoryview((yield from iofree.read(length))) as fragment:
+        assert fragment[0] == 2, f"expect server_hello(2), bug got: {fragment[0]}"
+        handshake_length = int.from_bytes(fragment[1:4], "big")
+        server_hello = fragment[4 : handshake_length + 4]
     assert server_hello[:2] == tls_version, "expect: server_version(3.3)"
     verify_id = server_hello[2:34]
     sha1 = hmac.new(
@@ -56,8 +56,8 @@ def tls1_2_response(plugin):
         x = yield from iofree.peek(1)
         if x[0] != 22:
             break
-        ticket_head = memoryview((yield from iofree.read(5)))
-        length = int.from_bytes(ticket_head[-2:], "big")
+        with memoryview((yield from iofree.read(5))) as ticket_head:
+            length = int.from_bytes(ticket_head[-2:], "big")
         assert length == length & 0x3FFF, f"{length} is over 2^14"
         yield from iofree.read(length)
     yield from ChangeCipherReader(
@@ -69,16 +69,16 @@ def tls1_2_response(plugin):
 @iofree.parser
 def tls1_2_request(plugin):
     tls_version = plugin.tls_version
-    tls_plaintext_head = memoryview((yield from iofree.read(5)))
-    assert (
-        tls_plaintext_head[:3] == b"\x16\x03\x01"
-    ), "invalid tls head: handshake(22) protocol_version(3.1)"
-    length = int.from_bytes(tls_plaintext_head[-2:], "big")
+    with memoryview((yield from iofree.read(5))) as tls_plaintext_head:
+        assert (
+            tls_plaintext_head[:3] == b"\x16\x03\x01"
+        ), "invalid tls head: handshake(22) protocol_version(3.1)"
+        length = int.from_bytes(tls_plaintext_head[-2:], "big")
     assert length == length & 0x3FFF, f"{length} is over 2^14"
-    fragment = memoryview((yield from iofree.read(length)))
-    assert fragment[0] == 1, "expect client_hello(1), but got {fragment[0]}"
-    handshake_length = int.from_bytes(fragment[1:4], "big")
-    client_hello = fragment[4 : handshake_length + 4]
+    with memoryview((yield from iofree.read(length))) as fragment:
+        assert fragment[0] == 1, "expect client_hello(1), but got {fragment[0]}"
+        handshake_length = int.from_bytes(fragment[1:4], "big")
+        client_hello = fragment[4 : handshake_length + 4]
     assert client_hello[:2] == tls_version, "expect: client_version(3.3)"
     verify_id = client_hello[2:34]
     # TODO: replay attact detect
@@ -126,34 +126,36 @@ def tls1_2_request(plugin):
 
 
 def ChangeCipherReader(plugin, key, session_id):
-    data = memoryview((yield from iofree.read(11)))
-    assert data[0] == 0x14, f"{data[0]} != change_cipher_spec(20) {data.tobytes()}"
-    assert (
-        data[1:3] == plugin.tls_version
-    ), f"{data[1:3].tobytes()} != version({plugin.tls_version})"
-    assert data[3:6] == b"\x00\x01\x01", "bad ChangeCipherSpec"
-    assert data[6] == 0x16, f"{data[6]} != Finish(22)"
-    assert (
-        data[7:9] == plugin.tls_version
-    ), f"{data[7:9]} != version({plugin.tls_version})"
-    assert data[9] == 0x00, f"{data[9]} != Finish(0)"
-    verify_len = int.from_bytes(data[9:11], "big")
-    verify = memoryview((yield from iofree.read(verify_len)))
-    sha1 = hmac.new(
-        key + session_id, b"".join([data, verify[:-10]]), hashlib.sha1
-    ).digest()[:10]
-    assert sha1 == verify[-10:], "hmac verify failed"
+    with memoryview((yield from iofree.read(11))) as data:
+        assert data[0] == 0x14, f"{data[0]} != change_cipher_spec(20) {data.tobytes()}"
+        assert (
+            data[1:3] == plugin.tls_version
+        ), f"{data[1:3].tobytes()} != version({plugin.tls_version})"
+        assert data[3:6] == b"\x00\x01\x01", "bad ChangeCipherSpec"
+        assert data[6] == 0x16, f"{data[6]} != Finish(22)"
+        assert (
+            data[7:9] == plugin.tls_version
+        ), f"{data[7:9]} != version({plugin.tls_version})"
+        assert data[9] == 0x00, f"{data[9]} != Finish(0)"
+        verify_len = int.from_bytes(data[9:11], "big")
+        with memoryview((yield from iofree.read(verify_len))) as verify:
+            sha1 = hmac.new(
+                key + session_id, b"".join([data, verify[:-10]]), hashlib.sha1
+            ).digest()[:10]
+            assert sha1 == verify[-10:], "hmac verify failed"
 
 
 @iofree.parser
 def application_data(plugin):
     while True:
-        data = memoryview((yield from iofree.read(5)))
-        assert data[0] == 0x17, f"{data[0]} != application_data(23) {data.tobytes()}"
-        assert (
-            data[1:3] == plugin.tls_version
-        ), f"{data[1:3].tobytes()} != version({plugin.tls_version})"
-        size = int.from_bytes(data[3:], "big")
-        assert size == size & 0x3FFF, f"{size} is over 2^14"
-        data = yield from iofree.read(size)
-        yield from iofree.write(data)
+        with memoryview((yield from iofree.read(5))) as data:
+            assert (
+                data[0] == 0x17
+            ), f"{data[0]} != application_data(23) {data.tobytes()}"
+            assert (
+                data[1:3] == plugin.tls_version
+            ), f"{data[1:3].tobytes()} != version({plugin.tls_version})"
+            size = int.from_bytes(data[3:], "big")
+            assert size == size & 0x3FFF, f"{size} is over 2^14"
+            data = yield from iofree.read(size)
+            yield from iofree.write(data)

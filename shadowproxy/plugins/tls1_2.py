@@ -51,13 +51,15 @@ class TLS1_2Plugin(Plugin):
 
     def encode(self, data):
         ret = b""
-        data = memoryview(data)
-        while len(data) > 2048:
-            size = min(random.randrange(4096) + 100, len(data))
-            ret += b"\x17" + self.tls_version + size.to_bytes(2, "big") + data[:size]
-            data = data[size:]
-        if len(data) > 0:
-            ret += b"\x17" + self.tls_version + pack_uint16(data)
+        with memoryview(data) as data:
+            while len(data) > 2048:
+                size = min(random.randrange(4096) + 100, len(data))
+                ret += (
+                    b"\x17" + self.tls_version + size.to_bytes(2, "big") + data[:size]
+                )
+                data = data[size:]
+            if len(data) > 0:
+                ret += b"\x17" + self.tls_version + pack_uint16(data)
         return ret
 
     async def init_client(self, client):
