@@ -96,6 +96,13 @@ def get_server(uri, is_via=False):
         plugin_name, _, args = plugin_info.partition(";")
         args = [arg for arg in args.split(",") if arg]
         kwargs["plugin"] = plugins[plugin_name](*args)
+    if "source_ip" in qs:
+        source_ip = qs["source_ip"][0]
+        if source_ip in ("in", "same"):
+            ip = kwargs["bind_addr"][0]
+            if ip != "127.0.0.1":
+                source_ip = ip
+        kwargs["source_addr"] = (source_ip, 0)
     if is_via:
         kwargs["uri"] = uri
         return ViaNamespace(ClientClass=proto, **kwargs)
@@ -194,7 +201,7 @@ def main(arguments=None):
     gvars.logger.setLevel(level)
     try:
         resource.setrlimit(resource.RLIMIT_NOFILE, (50000, 50000))
-    except Exception as e:
+    except Exception:
         gvars.logger.warning("Require root permission to allocate resources")
     kernel = curio.Kernel()
     try:

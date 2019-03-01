@@ -70,7 +70,7 @@ usage: shadowproxy [-h] [-v] [--version] [--monitor] server [server ...]
 
 uri syntax:
 
-{scheme}://[{userinfo}@][hostname]:{port}[/?[plugin={p;args}][via={uri}][target={t}]][#{fragment}]
+{scheme}://[{userinfo}@][hostname]:{port}[/?[plugin={p;args}][via={uri}][target={t}][source_ip={ip}]][#{fragment}]
 
 userinfo = cipher:password or base64(cipher:password) when scheme is ss, ssudp
 userinfo = username:password or base64(username:password) when scheme is socks, http.

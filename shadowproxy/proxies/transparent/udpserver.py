@@ -14,10 +14,11 @@ IP_RECVORIGDSTADDR = IP_ORIGDSTADDR
 class TransparentUDPServer(UDPServerBase):
     proto = "RED(UDP)"
 
-    def __init__(self, bind_addr, via=None):
+    def __init__(self, bind_addr, via=None, **kwargs):
         self.bind_addr = bind_addr
         self.via = via or ViaNamespace(ClientClass=UDPClient)
         self.removed = None
+        self.kwargs = kwargs
 
         def callback(key, value):
             self.removed = (key, value)

@@ -24,7 +24,9 @@ async def main(bind_addr, *server_coros):
 
 
 def test_tunneludp():
-    server, bind_addr, _ = get_server("tunneludp://127.0.0.1:0?target=1.1.1.1:53")
+    server, bind_addr, _ = get_server(
+        "tunneludp://127.0.0.1:0?target=1.1.1.1:53&source_ip=in"
+    )
     curio.run(main(bind_addr, server))
 
 

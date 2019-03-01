@@ -8,11 +8,12 @@ from ..base.udpserver import UDPServerBase
 class SSUDPServer(UDPServerBase):
     proto = "SS(UDP)"
 
-    def __init__(self, cipher, bind_addr, via=None):
+    def __init__(self, cipher, bind_addr, via=None, **kwargs):
         self.cipher = cipher
         self.bind_addr = bind_addr
         self.via = via or ViaNamespace(ClientClass=UDPClient)
         self.removed = None
+        self.kwargs = kwargs
 
         def callback(key, value):
             self.removed = (key, value)

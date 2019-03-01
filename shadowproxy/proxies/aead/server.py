@@ -7,11 +7,12 @@ from ..shadowsocks.parser import addr_reader
 class AEADProxy(ProxyBase):
     proto = "AEAD"
 
-    def __init__(self, cipher, bind_addr, via=None, plugin=None):
+    def __init__(self, cipher, bind_addr, via=None, plugin=None, **kwargs):
         self.cipher = cipher
         self.bind_addr = bind_addr
         self.via = via
         self.plugin = plugin
+        self.kwargs = kwargs
         self.aead_parser = aead_reader.parser(self.cipher)
 
     async def _run(self):

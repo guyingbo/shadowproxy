@@ -7,6 +7,8 @@ class UDPClient:
     def __init__(self, ns=None):
         self.ns = ns
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if "source_addr" in self.ns:
+            self.sock.bind(self.ns["source_addr"])
         self._task = None
 
     async def sendto(self, data, addr):

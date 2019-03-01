@@ -74,7 +74,8 @@ class ClientBase(abc.ABC):
         self.target_addr = target_addr
         if self.sock:
             return
-        self.sock = await open_connection(*self.ns.bind_addr)
+        source_addr = self.ns.get("source_addr")
+        self.sock = await open_connection(*self.ns.bind_addr, source_addr=source_addr)
 
     @abc.abstractmethod
     async def init(self):
