@@ -22,13 +22,11 @@ class SocksClient(ClientBase):
         request = b"\x05\x01\x00" + pack_addr(self.target_addr)
         await self.sock.sendall(handshake + request)
         response_parser = socks5_response.parser(auth)
-        while True:
+        while not response_parser.has_result:
             data = await self.sock.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("socks5 handshake failed")
             response_parser.send(data)
-            if response_parser.has_result:
-                break
         redundant = response_parser.readall()
         set_disposable_recv(self.sock, redundant)
 
@@ -44,13 +42,11 @@ class Socks4Client(ClientBase):
         addr = random.choice(info)[-1]
         handshake = b"\x04\x01" + pack_ipv4(addr)
         await self.sock.sendall(handshake)
-        while True:
+        while not response_parser.has_result:
             data = await self.sock.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("socks4 handshake failed")
             response_parser.send(data)
-            if response_parser.has_result:
-                break
         redundant = response_parser.readall()
         set_disposable_recv(self.sock, redundant)
 

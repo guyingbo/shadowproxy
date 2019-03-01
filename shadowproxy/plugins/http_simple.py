@@ -21,13 +21,11 @@ class HttpSimplePlugin(Plugin):
 
     async def init_server(self, client):
         parser = http_request.parser()
-        while True:
+        while not parser.has_result:
             data = await client.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("incomplete http request")
             parser.send(data)
-            if parser.has_result:
-                break
         namespace = parser.get_result()
         head = bytes.fromhex(namespace.path[1:].replace(b"%", b"").decode("ascii"))
         await client.sendall(
@@ -47,13 +45,11 @@ class HttpSimplePlugin(Plugin):
         request = request_tmpl % client.target_address.encode()
         await client.sock.sendall(request)
         parser = http_response.parser()
-        while True:
+        while not parser.has_result:
             data = await client.sock.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("http_simple plugin handshake failed")
             parser.send(data)
-            if parser.has_result:
-                break
         namespace = parser.get_result()
         assert (
             namespace.code == b"200"
