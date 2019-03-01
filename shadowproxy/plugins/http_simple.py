@@ -26,8 +26,7 @@ class HttpSimplePlugin(Plugin):
             if not data:
                 raise Exception("incomplete http request")
             parser.send(data)
-        namespace = parser.get_result()
-        head = bytes.fromhex(namespace.path[1:].replace(b"%", b"").decode("ascii"))
+        head = bytes.fromhex(parser.path[1:].replace(b"%", b"").decode("ascii"))
         await client.sendall(
             b"HTTP/1.1 200 OK\r\n"
             b"Connection: keep-alive\r\n"
@@ -50,9 +49,8 @@ class HttpSimplePlugin(Plugin):
             if not data:
                 raise Exception("http_simple plugin handshake failed")
             parser.send(data)
-        namespace = parser.get_result()
         assert (
-            namespace.code == b"200"
-        ), f"bad status code {namespace.code} {namespace.status}"
+            parser.code == b"200"
+        ), f"bad status code {parser.code} {parser.status}"
         redundant = parser.readall()
         set_disposable_recv(client.sock, redundant)

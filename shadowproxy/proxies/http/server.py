@@ -21,24 +21,23 @@ class HTTPProxy(ProxyBase):
             if not data:
                 raise Exception("incomplete http connect request")
             parser.send(data)
-        ns = parser.get_result()
         if self.auth:
-            pauth = ns.headers.get(b"Proxy-Authorization", None)
+            pauth = parser.headers.get(b"Proxy-Authorization", None)
             httpauth = b"Basic " + base64.b64encode(b":".join(self.auth))
             if httpauth != pauth:
                 await self.client.sendall(
-                    ns.ver + b" 407 Proxy Authentication Required\r\n"
+                    parser.ver + b" 407 Proxy Authentication Required\r\n"
                     b"Connection: close\r\n"
                     b'Proxy-Authenticate: Basic realm="simple"\r\n\r\n'
                 )
                 raise Exception("Unauthorized HTTP Request")
-        if ns.method == b"CONNECT":
+        if parser.method == b"CONNECT":
             self.proto = "HTTP(CONNECT)"
-            host, _, port = ns.path.partition(b":")
+            host, _, port = parser.path.partition(b":")
             self.target_addr = (host.decode(), int(port))
         else:
             self.proto = "HTTP(ONLY)"
-            url = parse.urlparse(ns.path)
+            url = parse.urlparse(parser.path)
             if not url.hostname:
                 await self.client.sendall(
                     b"HTTP/1.1 200 OK\r\n"
@@ -52,7 +51,7 @@ class HTTPProxy(ProxyBase):
             newpath = url._replace(netloc=b"", scheme=b"").geturl()
         via_client = await self.connect_server(self.target_addr)
         async with via_client:
-            if ns.method == b"CONNECT":
+            if parser.method == b"CONNECT":
                 await self.client.sendall(
                     b"HTTP/1.1 200 Connection: Established\r\n\r\n"
                 )
@@ -60,13 +59,13 @@ class HTTPProxy(ProxyBase):
             else:
                 lines = b"\r\n".join(
                     b"%s: %s" % (k, v)
-                    for k, v in ns.headers.items()
+                    for k, v in parser.headers.items()
                     if not k.startswith(b"Proxy-")
                 )
                 remote_req_headers = b"%s %s %s\r\n%s\r\n\r\n" % (
-                    ns.method,
+                    parser.method,
                     newpath,
-                    ns.ver,
+                    parser.ver,
                     lines,
                 )
             redundant = parser.readall()

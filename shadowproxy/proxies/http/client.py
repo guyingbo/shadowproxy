@@ -50,9 +50,8 @@ class HTTPClient(ClientBase):
             if not data:
                 raise Exception("http client handshake failed")
             parser.send(data)
-        namespace = parser.get_result()
         assert (
-            namespace.code == b"200"
-        ), f"bad status code: {namespace.code} {namespace.status}"
+            parser.code == b"200"
+        ), f"bad status code: {parser.code} {parser.status}"
         redundant = parser.readall()
         set_disposable_recv(self.sock, redundant)
