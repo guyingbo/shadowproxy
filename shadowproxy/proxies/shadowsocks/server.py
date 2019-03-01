@@ -20,13 +20,11 @@ class SSProxy(ProxyBase):
             await self.plugin.init_server(self.client)
 
         addr_parser = addr_reader.parser()
-        while True:
+        while not addr_parser.has_result:
             data = await self.recv(gvars.PACKET_SIZE)
             if not data:
-                break
+                return
             addr_parser.send(data)
-            if addr_parser.has_result:
-                break
         self.target_addr, _ = addr_parser.get_result()
         via_client = await self.connect_server(self.target_addr)
 

@@ -45,13 +45,11 @@ class HTTPClient(ClientBase):
         await self.sock.sendall(headers_str.encode())
 
         parser = http_response.parser()
-        while True:
+        while not parser.has_result:
             data = await self.sock.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("http client handshake failed")
             parser.send(data)
-            if parser.has_result:
-                break
         namespace = parser.get_result()
         assert (
             namespace.code == b"200"

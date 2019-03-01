@@ -2,7 +2,7 @@ import os
 import secrets
 from shadowproxy.ciphers import AES128GCM, AES256CFB
 from shadowproxy.proxies.shadowsocks.parser import addr_reader, ss_reader
-from shadowproxy.proxies.aead.parser import AEADProtocol
+from shadowproxy.proxies.aead.parser import aead_reader
 from shadowproxy.utils import pack_addr
 
 
@@ -34,7 +34,7 @@ def test_aead():
     cipher = AES128GCM(secrets.token_urlsafe(20))
     salt, encrypt = cipher.make_encrypter()
     length = len(salt) // 2
-    aead = AEADProtocol(cipher).parser()
+    aead = aead_reader.parser(cipher)
     aead.send(salt[:length])
     assert aead.read() == b""
     data = os.urandom(20)

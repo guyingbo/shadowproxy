@@ -16,13 +16,11 @@ class HTTPProxy(ProxyBase):
 
     async def _run(self):
         parser = http_request.parser()
-        while True:
+        while not parser.has_result:
             data = await self.client.recv(gvars.PACKET_SIZE)
             if not data:
                 raise Exception("incomplete http connect request")
             parser.send(data)
-            if parser.has_result:
-                break
         ns = parser.get_result()
         if self.auth:
             pauth = ns.headers.get(b"Proxy-Authorization", None)

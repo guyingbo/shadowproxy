@@ -22,30 +22,31 @@ def read_addr():
 
 @iofree.parser
 def socks5_request(auth=False):
+    parser = yield from iofree.get_parser()
     ver, nmethods = yield from iofree.read_struct("!BB")
     assert ver == 5, f"bad socks version: {ver}"
     assert nmethods != 0, f"nmethods can't be 0"
     methods = yield from iofree.read(nmethods)
     if auth and b"\x02" not in methods:
-        yield from iofree.write(b"\x05\x02")
+        parser.write(b"\x05\x02")
         raise Exception("server needs authentication")
     elif b"\x00" not in methods:
-        yield from iofree.write(b"\x05\x00")
+        parser.write(b"\x05\x00")
         raise Exception("method not support")
     if auth:
-        yield from iofree.write(b"\x05\x02")
+        parser.write(b"\x05\x02")
         auth_ver, username_length = yield from iofree.read_struct("!BB")
         assert auth_ver == 1, f"invalid auth version {auth_ver}"
         username = yield from iofree.read(username_length)
         password_length = (yield from iofree.read(1))[0]
         password = yield from iofree.read(password_length)
         if (username, password) != auth:
-            yield from iofree.write(b"\x01\x01")
+            parser.write(b"\x01\x01")
             raise Exception("authenticate failed")
         else:
-            yield from iofree.write(b"\x01\x00")
+            parser.write(b"\x01\x00")
     else:
-        yield from iofree.write(b"\x05\x00")
+        parser.write(b"\x05\x00")
     ver, cmd, rsv = yield from iofree.read_struct("!BBB")
     if cmd == 1:  # connect
         pass

@@ -1,5 +1,5 @@
 from ... import gvars
-from .parser import AEADProtocol
+from .parser import aead_reader
 from ..base.server import ProxyBase
 from ..shadowsocks.parser import addr_reader
 
@@ -12,7 +12,7 @@ class AEADProxy(ProxyBase):
         self.bind_addr = bind_addr
         self.via = via
         self.plugin = plugin
-        self.aead_parser = AEADProtocol(self.cipher).parser()
+        self.aead_parser = aead_reader.parser(self.cipher)
 
     async def _run(self):
         if self.plugin:
@@ -21,13 +21,11 @@ class AEADProxy(ProxyBase):
             await self.plugin.init_server(self.client)
 
         addr_parser = addr_reader.parser()
-        while True:
+        while not addr_parser.has_result:
             data = await self.recv(gvars.PACKET_SIZE)
             if not data:
                 break
             addr_parser.send(data)
-            if addr_parser.has_result:
-                break
 
         self.target_addr, _ = addr_parser.get_result()
         via_client = await self.connect_server(self.target_addr)

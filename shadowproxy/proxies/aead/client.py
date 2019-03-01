@@ -1,13 +1,13 @@
 from ...utils import pack_addr
 from ..base.client import ClientBase
-from .parser import AEADProtocol
+from .parser import aead_reader
 
 
 class AEADClient(ClientBase):
     proto = "AEAD"
 
     async def init(self):
-        self.aead_parser = AEADProtocol(self.ns.cipher).parser()
+        self.aead_parser = aead_reader.parser(self.ns.cipher)
         self.plugin = getattr(self.ns, "plugin", None)
         if self.plugin:
             self.plugin.client = self

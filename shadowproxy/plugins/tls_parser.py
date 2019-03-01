@@ -68,6 +68,7 @@ def tls1_2_response(plugin):
 
 @iofree.parser
 def tls1_2_request(plugin):
+    parser = yield from iofree.get_parser()
     tls_version = plugin.tls_version
     with memoryview((yield from iofree.read(5))) as tls_plaintext_head:
         assert (
@@ -121,7 +122,7 @@ def tls1_2_request(plugin):
     change_cipher_spec += hmac.new(
         plugin.server.cipher.master_key + session_id, change_cipher_spec, hashlib.sha1
     ).digest()[:10]
-    yield from iofree.write(server_hello + change_cipher_spec)
+    parser.write(server_hello + change_cipher_spec)
     yield from ChangeCipherReader(plugin, plugin.server.cipher.master_key, session_id)
 
 
@@ -147,6 +148,7 @@ def ChangeCipherReader(plugin, key, session_id):
 
 @iofree.parser
 def application_data(plugin):
+    parser = yield from iofree.get_parser()
     while True:
         with memoryview((yield from iofree.read(5))) as data:
             assert (
@@ -158,4 +160,4 @@ def application_data(plugin):
             size = int.from_bytes(data[3:], "big")
             assert size == size & 0x3FFF, f"{size} is over 2^14"
             data = yield from iofree.read(size)
-            yield from iofree.write(data)
+            parser.write(data)

@@ -16,16 +16,14 @@ class SocksProxy(ProxyBase):
     async def _run(self):
         socks5_parser = socks5_request.parser(self.auth)
 
-        while True:
+        while not socks5_parser.has_result:
             data = await self.client.recv(gvars.PACKET_SIZE)
             if not data:
-                break
+                return
             socks5_parser.send(data)
             data = socks5_parser.read()
             if data:
                 await self.client.sendall(data)
-            if socks5_parser.has_result:
-                break
         self.target_addr, cmd = socks5_parser.get_result()
         assert cmd == 1, f"only support connect command {cmd}"
         via_client = await self.connect_server(self.target_addr)
@@ -53,14 +51,12 @@ class Socks4Proxy(ProxyBase):
     async def _run(self):
         socks4_parser = socks4_request.parser()
 
-        while True:
+        while not socks4_parser.has_result:
             data = await self.client.recv(gvars.PACKET_SIZE)
             if not data:
-                break
+                return
             socks4_parser.send(data)
             data = socks4_parser.read()
-            if socks4_parser.has_result:
-                break
         self.target_addr = socks4_parser.get_result()
         via_client = await self.connect_server(self.target_addr)
         await self.client.sendall(b"\x00\x5a\x00\x00\x00\x00\x00\x00")
