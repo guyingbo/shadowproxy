@@ -55,13 +55,13 @@ class ProxyBase(abc.ABC):
         )
 
     async def connect_server(self, target_addr):
+        source_addr = self.kwargs.get("source_addr")
         if self.via:
             via_client = self.via.new()
             self._via_address = f"{via_client.proto} -- {via_client.bind_address}"
-            await via_client.connect(target_addr)
+            await via_client.connect(target_addr, source_addr)
             await via_client.init()
         else:
-            source_addr = self.kwargs.get("source_addr")
             via_client = await open_connection(*target_addr, source_addr=source_addr)
         gvars.logger.info(self)
         return via_client

@@ -67,14 +67,13 @@ class ClientBase(abc.ABC):
     def target_address(self) -> str:
         return f"{self.target_addr[0]}:{self.target_addr[1]}"
 
-    async def connect(self, target_addr):
+    async def connect(self, target_addr, source_addr=None):
         assert not is_local(
             target_addr[0]
         ), f"local target address is forbidden {target_addr}"
         self.target_addr = target_addr
         if self.sock:
             return
-        source_addr = self.ns.get("source_addr")
         self.sock = await open_connection(*self.ns.bind_addr, source_addr=source_addr)
 
     @abc.abstractmethod
