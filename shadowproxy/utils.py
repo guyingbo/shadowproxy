@@ -10,6 +10,8 @@ from . import gvars
 
 
 def is_global(host: str) -> bool:
+    if host == "localhost":
+        return False
     try:
         address = ipaddress.ip_address(host)
     except ValueError:

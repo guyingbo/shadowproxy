@@ -25,7 +25,7 @@ It is a replacement of shadowsocks and shadowsocks-libev, you can replace ss-red
 shadowproxy requires Python3.6+
 
 ```
-pip install shadowproxy
+pip3 install shadowproxy
 ```
 
 ## Features
@@ -63,6 +63,22 @@ tls1.2_ticket_auth | ✓ | ✓
 * aes-192-gcm
 * aes-128-gcm
 
+### other features
+
+* support both IPv4 and IPv6
+
+Here is some ipv6 url examples:
+
+```
+http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html
+http://[1080:0:0:0:8:800:200C:417A]/index.html
+http://[3ffe:2a00:100:7031::1]
+http://[1080::8:800:200C:417A]/foo
+http://[::192.9.5.5]/ipng
+http://[::FFFF:129.144.52.38]:80/index.html
+http://[2010:836B:4179::836B:4179]
+```
+
 ## Usage
 
 ```
@@ -80,6 +96,12 @@ userinfo = username:password or base64(username:password) when scheme is socks, 
 examples:
 
 ```
+# simple shadowsocks server
+shadowproxy ss://chacha20:password@0.0.0.0:8888
+
+# ipv6 binding
+shadowproxy ss://chacha20:password@[::]:8888
+
 # socks5 --> shadowsocks
 shadowproxy -v socks://:8527/?via=ss://aes-256-cfb:password@127.0.0.1:8888
 
@@ -88,9 +110,6 @@ shadowproxy -v http://:8527/?via=ss://aes-256-cfb:password@127.0.0.1:8888
 
 # redir  --> shadowsocks
 shadowproxy -v red://:12345/?via=ss://aes-256-cfb:password@127.0.0.1:8888
-
-# shadowsocks server (tcp)
-shadowproxy -v ss://aes-256-cfb:password@:8888
 
 # shadowsocks server (udp)
 shadowproxy -v ssudp://aes-256-cfb:password@:8527
@@ -101,4 +120,3 @@ shadowproxy -v tunneludp://:8527/?target=8.8.8.8:53&via=ssudp://aes-256-cfb:pass
 # tproxy --> shadowsocks (udp)
 shadowproxy -v tproxyudp://:8527/?via=ssudp://aes-256-cfb:password@127.0.0.1:8888
 ```
-
