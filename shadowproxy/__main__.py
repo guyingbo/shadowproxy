@@ -121,15 +121,15 @@ def get_server(uri, is_via=False):
     family = socket.AF_INET6 if ":" in bind_addr[0] else socket.AF_INET
     if url.scheme.endswith("udp"):
         server_sock = udp_server_socket(*bind_addr, family=family)
-        bind_addr = server_sock._socket.getsockname()
+        real_ip, real_port, *_ = server_sock._socket.getsockname()
         server = run_udp_server(server_sock, proto(**kwargs))
     else:
         server_sock = curio.tcp_server_socket(*bind_addr, backlog=1024, family=family)
-        bind_addr = server_sock._socket.getsockname()
+        real_ip, real_port, *_ = server_sock._socket.getsockname()
         server = run_server(
             server_sock, TcpProtoFactory(proto, **kwargs), ssl=get_ssl(url)
         )
-    return server, bind_addr, url.scheme
+    return server, (real_ip, real_port), url.scheme
 
 
 def get_client(uri):
