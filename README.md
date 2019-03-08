@@ -14,9 +14,9 @@
 
 A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols.
 
-Thanks to Dabeaz's awesome curio project: https://github.com/dabeaz/curio
+Thanks to Dabeaz's awesome [curio](https://github.com/dabeaz/curio) project.
 
-This project is inspired by qwj's python-proxy project(https://github.com/qwj/python-proxy).
+This project is inspired by qwj's [python-proxy](https://github.com/qwj/python-proxy) project.
 
 It is a replacement of shadowsocks and shadowsocks-libev, you can replace ss-redir, ss-tunnel, ss-server, ss-local with just one shadowproxy command.
 
@@ -67,7 +67,7 @@ tls1.2_ticket_auth | ✓ | ✓
 
 * support both IPv4 and IPv6
 
-Here is some ipv6 url examples:
+Here are some ipv6 url examples:
 
 ```
 http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html
