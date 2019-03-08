@@ -89,7 +89,6 @@ def human_speed(speed: int) -> str:
 
 
 async def open_connection(host, port, **kwargs):
-    assert is_global(host), f"non global target address is forbidden {host}"
     for i in range(2, -1, -1):
         try:
             return await curio.open_connection(host, port, **kwargs)

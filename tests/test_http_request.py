@@ -4,11 +4,15 @@ from shadowproxy import gvars
 from shadowproxy.__main__ import get_server, get_client
 
 gvars.logger.setLevel(10)
+url_https = "https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+url_http = "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+# url_https = "https://httpbin.org/ip"
+# url_http = "http://httpbin.org/ip"
 
 
 async def make_request(client, url=None):
     if url is None:
-        url = "https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+        url = url_https
     headers = ["User-Agent: curl/7.54.0", "Accept: */*"]
     async with client:
         async with curio.timeout_after(20):
@@ -43,8 +47,7 @@ def test_http_only():
     server, bind_addr, _ = get_server("http://user:password@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
     client = get_client(f"httponly://user:password@{bind_address}")
-    url = "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
-    curio.run(main(make_request(client, url), server))
+    curio.run(main(make_request(client, url_http), server))
 
 
 def test_socks5():

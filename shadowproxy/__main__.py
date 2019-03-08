@@ -51,7 +51,7 @@ def get_ssl(url):
 
 def parse_addr(s):
     host, _, port = s.rpartition(":")
-    port = 0 if not port else int(port)
+    port = -1 if not port else int(port)
     if not host:
         host = "0.0.0.0"
     elif len(host) >= 4 and host[0] == "[" and host[-1] == "]":
@@ -91,7 +91,7 @@ def get_server(uri, is_via=False):
             f"you need to assign cryto algorithm and password: {uri}"
         )
     host, port = parse_addr(loc)
-    if not port:
+    if port == -1:
         port = gvars.default_ports.get(url.scheme, gvars.default_port)
     bind_addr = (str(host), port)
     kwargs["bind_addr"] = bind_addr
