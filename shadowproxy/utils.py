@@ -8,25 +8,13 @@ from . import gvars
 # from curio.signal import SignalEvent
 # from microstats import MicroStats
 
-local_networks = [
-    "0.0.0.0/8",
-    "10.0.0.0/8",
-    "127.0.0.0/8",
-    "169.254.0.0/16",
-    "172.16.0.0/12",
-    "192.168.0.0/16",
-    "224.0.0.0/4",
-    "240.0.0.0/4",
-]
-local_networks = [ipaddress.ip_network(s) for s in local_networks]
 
-
-def is_local(host: str) -> bool:
+def is_global(host: str) -> bool:
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
-        return False
-    return any(address in nw for nw in local_networks)
+        return True
+    return address.is_global
 
 
 def pack_bytes(data: bytes, length: int = 1) -> bytes:
@@ -101,6 +89,7 @@ def human_speed(speed: int) -> str:
 
 
 async def open_connection(host, port, **kwargs):
+    assert is_global(host), f"non global target address is forbidden {host}"
     for i in range(2, -1, -1):
         try:
             return await curio.open_connection(host, port, **kwargs)

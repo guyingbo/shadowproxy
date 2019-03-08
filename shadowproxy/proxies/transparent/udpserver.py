@@ -2,7 +2,7 @@ import struct
 import pylru
 import weakref
 from curio import socket
-from ...utils import is_local, ViaNamespace
+from ...utils import is_global, ViaNamespace
 from ..base.udpclient import UDPClient
 from ..base.udpserver import UDPServerBase
 
@@ -43,7 +43,7 @@ class TransparentUDPServer(UDPServerBase):
             target_addr = self.get_origin_dst(ancdata)
             if target_addr is None:
                 continue
-            elif is_local(target_addr[0]):
+            elif not is_global(target_addr[0]):
                 continue
             if addr not in self.via_clients:
                 via_client = self.via.new()

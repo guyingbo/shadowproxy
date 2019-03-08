@@ -25,6 +25,13 @@ async def main(coro, *server_coros):
         await g.cancel_remaining()
 
 
+def test_ipv6():
+    server, bind_addr, _ = get_server("http://user:password@[::1]:0")
+    bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
+    client = get_client(f"http://user:password@{bind_address}")
+    curio.run(main(make_request(client), server))
+
+
 def test_http():
     server, bind_addr, _ = get_server("http://user:password@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"

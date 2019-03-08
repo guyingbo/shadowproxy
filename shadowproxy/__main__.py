@@ -6,6 +6,7 @@ import logging
 import argparse
 import resource
 import importlib
+import ipaddress
 from curio import ssl
 from curio import socket
 from curio.network import run_server
@@ -48,6 +49,25 @@ def get_ssl(url):
     return ssl_context
 
 
+def parse_addr(s):
+    host, _, port = s.rpartition(":")
+    port = 0 if not port else int(port)
+    if not host:
+        host = "0.0.0.0"
+    elif len(host) >= 4 and host[0] == "[" and host[-1] == "]":
+        host = host[1:-1]
+    return (ipaddress.ip_address(host), port)
+
+
+def parse_source_ip(qs, kwargs):
+    source_ip = qs["source_ip"][0]
+    if source_ip in ("in", "same"):
+        ip = ipaddress.ip_address(kwargs["bind_addr"][0])
+        if not ip.is_loopback:
+            source_ip = str(ip)
+    return (source_ip, 0)
+
+
 def get_server(uri, is_via=False):
     url = parse.urlparse(uri)
     kwargs = {}
@@ -70,15 +90,10 @@ def get_server(uri, is_via=False):
         raise argparse.ArgumentTypeError(
             f"you need to assign cryto algorithm and password: {uri}"
         )
-    if loc:
-        host, _, port = loc.partition(":")
-        if not port:
-            port = gvars.default_ports.get(url.scheme, gvars.default_port)
-        else:
-            port = int(port)
-        bind_addr = (host, port)
-    else:
-        bind_addr = ("", gvars.default_port)
+    host, port = parse_addr(loc)
+    if not port:
+        port = gvars.default_ports.get(url.scheme, gvars.default_port)
+    bind_addr = (str(host), port)
     kwargs["bind_addr"] = bind_addr
     if url.path not in ("", "/"):
         kwargs["path"] = url.path
@@ -89,31 +104,27 @@ def get_server(uri, is_via=False):
                 "destitation must be assign in tunnel udp mode, "
                 "example tunneludp://:53/?target=8.8.8.8:53"
             )
-        host, _, port = qs["target"][0].partition(":")
-        kwargs["target_addr"] = (host, int(port))
+        host, port = parse_addr(qs["target"][0])
+        kwargs["target_addr"] = (str(host), port)
     if "plugin" in qs:
         plugin_info = qs["plugin"][0]
         plugin_name, _, args = plugin_info.partition(";")
         args = [arg for arg in args.split(",") if arg]
         kwargs["plugin"] = plugins[plugin_name](*args)
     if "source_ip" in qs:
-        source_ip = qs["source_ip"][0]
-        if source_ip in ("in", "same"):
-            ip = kwargs["bind_addr"][0]
-            if ip != "127.0.0.1":
-                source_ip = ip
-        kwargs["source_addr"] = (source_ip, 0)
+        kwargs["source_addr"] = parse_source_ip(qs, kwargs)
     if is_via:
         kwargs["uri"] = uri
         return ViaNamespace(ClientClass=proto, **kwargs)
     elif "via" in qs:
         kwargs["via"] = get_server(qs["via"][0], True)
+    family = socket.AF_INET6 if ":" in bind_addr[0] else socket.AF_INET
     if url.scheme.endswith("udp"):
-        server_sock = udp_server_socket(*bind_addr)
+        server_sock = udp_server_socket(*bind_addr, family=family)
         bind_addr = server_sock._socket.getsockname()
         server = run_udp_server(server_sock, proto(**kwargs))
     else:
-        server_sock = curio.tcp_server_socket(*bind_addr, backlog=1024)
+        server_sock = curio.tcp_server_socket(*bind_addr, backlog=1024, family=family)
         bind_addr = server_sock._socket.getsockname()
         server = run_server(
             server_sock, TcpProtoFactory(proto, **kwargs), ssl=get_ssl(url)

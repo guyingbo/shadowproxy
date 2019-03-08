@@ -2,7 +2,7 @@ import abc
 from time import time
 from urllib import parse
 from ... import gvars
-from ...utils import open_connection, is_local
+from ...utils import open_connection
 
 
 class HTTPResponse:
@@ -68,9 +68,6 @@ class ClientBase(abc.ABC):
         return f"{self.target_addr[0]}:{self.target_addr[1]}"
 
     async def connect(self, target_addr, source_addr=None):
-        assert not is_local(
-            target_addr[0]
-        ), f"local target address is forbidden {target_addr}"
         self.target_addr = target_addr
         if self.sock:
             return

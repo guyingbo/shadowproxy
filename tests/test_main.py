@@ -3,7 +3,7 @@ import socket
 import pytest
 from ipaddress import ip_address
 from shadowproxy.utils import (
-    is_local,
+    is_global,
     pack_addr,
     unpack_addr,
     human_speed,
@@ -12,10 +12,11 @@ from shadowproxy.utils import (
 )
 
 
-def test_is_local():
-    assert is_local("127.0.0.1") is True
-    assert is_local("192.168.20.168") is True
-    assert is_local("211.13.20.168") is False
+def test_is_global():
+    assert not is_global("127.0.0.1")
+    assert not is_global("192.168.20.168")
+    assert is_global("211.13.20.168")
+    assert is_global("google.com")
 
 
 def test_pack_addr():
