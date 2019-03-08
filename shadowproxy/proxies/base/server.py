@@ -1,7 +1,7 @@
 import abc
 import curio
 from ... import gvars
-from ...utils import open_connection
+from ...utils import open_connection, is_global
 
 
 class ProxyBase(abc.ABC):
@@ -55,6 +55,9 @@ class ProxyBase(abc.ABC):
         )
 
     async def connect_server(self, target_addr):
+        assert is_global(
+            target_addr[0]
+        ), f"non global target address is forbidden {target_addr}"
         source_addr = self.kwargs.get("source_addr")
         if self.via:
             via_client = self.via.new()
