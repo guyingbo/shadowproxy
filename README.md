@@ -82,7 +82,7 @@ http://[2010:836B:4179::836B:4179]
 ## Usage
 
 ```
-usage: shadowproxy [-h] [-v] [--version] [--monitor] server [server ...]
+usage: shadowproxy [-h] [-v] [--version] server [server ...]
 
 uri syntax:
 
