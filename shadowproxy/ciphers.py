@@ -1,9 +1,8 @@
 import os
 import abc
-from hashlib import md5
+import hkdf
+from hashlib import md5, sha1
 from Crypto.Cipher import AES, ChaCha20, Salsa20, ARC4
-from Crypto.Protocol.KDF import HKDF
-from Crypto.Hash.SHA1 import SHA1Hash
 
 
 class BaseCipher:
@@ -44,9 +43,7 @@ class AEADCipher(BaseCipher, metaclass=abc.ABCMeta):
         ""
 
     def _derive_subkey(self, salt: bytes) -> bytes:
-        return HKDF(
-            self.master_key, self.KEY_SIZE, salt, SHA1Hash, 1, context=self.info
-        )
+        return hkdf.Hkdf(salt, self.master_key, sha1).expand(self.info, self.KEY_SIZE)
 
     def random_salt(self) -> bytes:
         return os.urandom(self.SALT_SIZE)
