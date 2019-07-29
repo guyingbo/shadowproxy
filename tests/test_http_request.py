@@ -12,7 +12,7 @@ url_http = "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
 
 async def make_request(client, url=None):
     if url is None:
-        url = url_https
+        url = url_http
     headers = ["User-Agent: curl/7.54.0", "Accept: */*"]
     async with client:
         async with curio.timeout_after(20):
