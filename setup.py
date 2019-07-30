@@ -39,6 +39,7 @@ setup(
         # "microstats>=0.1.0",
         "iofree>=0.1.2",
         "httptools",
+        "hkdf",
     ],
     entry_points={"console_scripts": ["shadowproxy = shadowproxy.__main__:main"]},
     classifiers=[
