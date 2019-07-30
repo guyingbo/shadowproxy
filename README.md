@@ -59,6 +59,7 @@ tls1.2_ticket_auth | ✓ | ✓
 * chacha20
 * salsa20
 * rc4
+* chacha20-ietf-poly1305
 * aes-256-gcm
 * aes-192-gcm
 * aes-128-gcm

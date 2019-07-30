@@ -2,7 +2,7 @@ import os
 import abc
 import hkdf
 from hashlib import md5, sha1
-from Crypto.Cipher import AES, ChaCha20, Salsa20, ARC4
+from Crypto.Cipher import AES, ChaCha20, Salsa20, ARC4, ChaCha20_Poly1305
 
 
 class BaseCipher:
@@ -104,15 +104,14 @@ class AES256GCM(AES128GCM):
     TAG_SIZE = 16
 
 
-# pycryptodome doesn't supoort chacha20-ietf-poly-1305 yet
-# class ChaCha20IETFPoly1305(AEADCipher):
-#     KEY_SIZE = 32
-#     SALT_SIZE = 32
-#     NONCE_SIZE = 12
-#     TAG_SIZE = 16
-#
-#     def new_cipher(self, subkey: bytes, nonce: bytes):
-#         return ChaCha20.new(key=subkey, nonce=nonce)
+class ChaCha20IETFPoly1305(AEADCipher):
+    KEY_SIZE = 32
+    SALT_SIZE = 32
+    NONCE_SIZE = 12
+    TAG_SIZE = 16
+
+    def new_cipher(self, subkey: bytes, nonce: bytes):
+        return ChaCha20_Poly1305.new(key=subkey, nonce=nonce)
 
 
 class StreamCipher(BaseCipher, metaclass=abc.ABCMeta):
@@ -203,4 +202,5 @@ ciphers = {
     "aes-256-gcm": AES256GCM,
     "aes-192-gcm": AES192GCM,
     "aes-128-gcm": AES128GCM,
+    "chacha20-ietf-poly1305": ChaCha20IETFPoly1305,
 }

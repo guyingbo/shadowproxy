@@ -18,8 +18,8 @@ def _read_some():
     with memoryview(chunk0) as data:
         length_bytes = parser.decrypt(data[:2], data[2:])
     length = int.from_bytes(length_bytes, "big")
-    if length != length & 0x3FFF:
-        raise Exception("invalid length")
+    if length != length & 0x3FFF:  # 16 * 1024 - 1
+        raise Exception("length exceed limit")
     chunk1 = yield from iofree.read(length + parser.cipher.TAG_SIZE)
     with memoryview(chunk1) as data:
         payload = parser.decrypt(data[:length], data[length:])
