@@ -21,6 +21,7 @@ class BaseCipher:
 class AEADCipher(BaseCipher, metaclass=abc.ABCMeta):
     info = b"ss-subkey"
     is_stream_cipher = False
+    PACKET_LIMIT = 0x3FFF
 
     @property
     @abc.abstractmethod
@@ -48,17 +49,23 @@ class AEADCipher(BaseCipher, metaclass=abc.ABCMeta):
     def random_salt(self) -> bytes:
         return os.urandom(self.SALT_SIZE)
 
-    def make_encrypter(self, salt: bytes = None):
+    def make_encrypter(self, salt: bytes = None) -> (bytes, bytes):
         counter = 0
         salt = salt if salt is not None else self.random_salt()
         subkey = self._derive_subkey(salt)
 
-        def encrypt(plaintext: bytes) -> (bytes, bytes):
+        def encrypt(plaintext: bytes) -> bytes:
             nonlocal counter
             nonce = counter.to_bytes(self.NONCE_SIZE, "little")
             counter += 1
             encrypter = self.new_cipher(subkey, nonce)
-            return encrypter.encrypt_and_digest(plaintext)
+            if len(plaintext) <= self.PACKET_LIMIT:
+                return encrypter.encrypt_and_digest(plaintext)
+            else:
+                with memoryview(plaintext) as data:
+                    return encrypter.encrypt_and_digest(
+                        data[: self.PACKET_LIMIT]
+                    ) + encrypt(data[self.PACKET_LIMIT :])
 
         return salt, encrypt
 
