@@ -43,10 +43,10 @@ def test_http():
     curio.run(main(make_request(client), server))
 
 
-def test_http_only():
+def test_http_forward():
     server, bind_addr, _ = get_server("http://user:password@127.0.0.1:0")
     bind_address = f"{bind_addr[0]}:{bind_addr[1]}"
-    client = get_client(f"httponly://user:password@{bind_address}")
+    client = get_client(f"forward://user:password@{bind_address}")
     curio.run(main(make_request(client, url_http), server))
 
 

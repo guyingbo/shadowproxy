@@ -3,6 +3,7 @@ from urllib import parse
 from ... import gvars
 from ..base.server import ProxyBase
 from .parser import http_request
+from .client import HTTPForwardClient
 
 
 class HTTPProxy(ProxyBase):
@@ -37,7 +38,7 @@ class HTTPProxy(ProxyBase):
             host, _, port = parser.path.partition(b":")
             self.target_addr = (host.decode(), int(port))
         else:
-            self.proto = "HTTP(ONLY)"
+            self.proto = "HTTP(PASS)"
             url = parse.urlparse(parser.path)
             if not url.hostname:
                 await self.client.sendall(
@@ -58,11 +59,15 @@ class HTTPProxy(ProxyBase):
                 )
                 remote_req_headers = b""
             else:
-                lines = b"\r\n".join(
+                headers_list = [
                     b"%s: %s" % (k, v)
                     for k, v in parser.headers.items()
                     if not k.startswith(b"Proxy-")
-                )
+                ]
+                if isinstance(via_client, HTTPForwardClient):
+                    headers_list.extend(via_client.extra_headers)
+                    newpath = url.geturl()
+                lines = b"\r\n".join(headers_list)
                 remote_req_headers = b"%s %s %s\r\n%s\r\n\r\n" % (
                     parser.method,
                     newpath,

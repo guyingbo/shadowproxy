@@ -124,3 +124,7 @@ class ViaNamespace(dict):
 
     def new(self):
         return self.ClientClass(self)
+
+
+def show(addr):
+    return f"{addr[0]}:{addr[1]}"

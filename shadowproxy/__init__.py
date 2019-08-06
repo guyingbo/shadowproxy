@@ -17,8 +17,8 @@ socks5          yes     yes     socks://
 socks4          yes     yes     socks4://
 ss              yes     yes     ss://
 ss aead         yes     yes     ss://
-http            yes     yes     httponly://
 http connect    yes     yes     http://
+http forward    yes     yes     forward://
 transparent     yes     no      red://
 
 examples:

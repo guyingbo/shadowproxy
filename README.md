@@ -38,8 +38,8 @@ socks5 | ✓ | ✓ | socks://
 socks4 | ✓ | ✓ | socks4://
 ss | ✓ | ✓ | ss://
 ss aead | ✓ | ✓ | ss://
-http | ✓ | ✓ | httponly://
 http connect | ✓ | ✓ | http://
+http forward |  | ✓ | forward://
 transparent proxy | ✓ | | red://
 tunnel(udp) | ✓ | | tunneludp://
 ss(udp) | ✓ | ✓ | ssudp://

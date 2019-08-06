@@ -47,7 +47,10 @@ def parse_addr(s):
         host = "0.0.0.0"
     elif len(host) >= 4 and host[0] == "[" and host[-1] == "]":
         host = host[1:-1]
-    return (ipaddress.ip_address(host), port)
+    try:
+        return (ipaddress.ip_address(host), port)
+    except ValueError:
+        return (host, port)
 
 
 def parse_source_ip(qs, kwargs):
@@ -72,7 +75,7 @@ def get_server(uri, is_via=False):
             kwargs["cipher"] = ciphers[cipher_name](password)
             if not kwargs["cipher"].is_stream_cipher:
                 proto = via_protos["aead"] if is_via else server_protos["aead"]
-        elif url.scheme in ("http", "https", "socks", "httponly"):
+        elif url.scheme in ("http", "https", "socks", "forward"):
             kwargs["auth"] = (cipher_name.encode(), password.encode())
     elif url.scheme in ("ss", "ssudp"):
         raise argparse.ArgumentTypeError(
