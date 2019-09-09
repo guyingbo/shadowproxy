@@ -4,6 +4,7 @@ on: [push]
 
 jobs:
   build:
+    runs-on: ubuntu-18.04
     steps:
     - name: Black Code Formatter
       uses: lgeiger/black-action@v1.0.1
