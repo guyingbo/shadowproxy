@@ -31,7 +31,7 @@ setup(
     maintainer="Yingbo Gu",
     maintainer_email="tensiongyb@gmail.com",
     url="https://github.com/guyingbo/shadowproxy",
-    packages=find_namespace_packages(include=['shadowproxy*']),
+    packages=find_namespace_packages(include=["shadowproxy*"]),
     install_requires=[
         "pycryptodome>=3.4.3",
         "curio>=0.9",

@@ -30,7 +30,7 @@ class HTTPProxy(ProxyBase):
                 await self.client.sendall(
                     parser.ver + b" 407 Proxy Authentication Required\r\n"
                     b"Connection: close\r\n"
-                    b'Proxy-Authenticate: Basic realm="simple"\r\n\r\n'
+                    b'Proxy-Authenticate: Basic realm="Shadowproxy Auth"\r\n\r\n'
                 )
                 raise Exception("Unauthorized HTTP Request")
         if parser.method == b"CONNECT":

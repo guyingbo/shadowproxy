@@ -49,8 +49,6 @@ class HttpSimplePlugin(Plugin):
             if not data:
                 raise Exception("http_simple plugin handshake failed")
             parser.send(data)
-        assert (
-            parser.code == b"200"
-        ), f"bad status code {parser.code} {parser.status}"
+        assert parser.code == b"200", f"bad status code {parser.code} {parser.status}"
         redundant = parser.readall()
         set_disposable_recv(client.sock, redundant)
