@@ -1,0 +1,10 @@
+name: Check Code
+
+on: [push]
+
+jobs:
+  build:
+    steps:
+    - name: Black Code Formatter
+      uses: lgeiger/black-action@v1.0.1
+      args: ". --check"
