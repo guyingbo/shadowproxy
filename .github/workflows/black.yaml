@@ -6,7 +6,9 @@ jobs:
   build:
     runs-on: ubuntu-18.04
     steps:
-    - python setup.py install
-    - pip install codecov
+    - name: test
+      run: python setup.py install
+    - name: install
+      run: pip install codecov
     - name: Black Code Formatter
       uses: lgeiger/black-action@v1.0.1
