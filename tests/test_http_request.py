@@ -4,8 +4,10 @@ from shadowproxy import gvars
 from shadowproxy.__main__ import get_server, get_client
 
 gvars.logger.setLevel(10)
-url_https = "https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
-url_http = "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+# url_https = "https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+# url_http = "http://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"
+url_https = "https://docs.python.org/3/_static/pygments.css"
+url_http = "http://docs.python.org/3/_static/pygments.css"
 # url_https = "https://httpbin.org/ip"
 # url_http = "http://httpbin.org/ip"
 
