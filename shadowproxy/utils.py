@@ -7,6 +7,27 @@ from . import gvars
 
 # from curio.signal import SignalEvent
 # from microstats import MicroStats
+import iofree
+from iofree import ParseError
+
+
+async def run_parser_curio(parser, sock):
+    parser.send(b"")
+    while True:
+        while parser.events:
+            data, close, exc, result = parser.events.popleft()
+            if data:
+                await sock.sendall(data)
+            if close:
+                await sock.close()
+            if exc:
+                raise exc
+            if result is not iofree._no_result:
+                return result
+        data = await sock.recv(gvars.PACKET_SIZE)
+        if not data:
+            raise ParseError("need data")
+        parser.send(data)
 
 
 def is_global(host: str) -> bool:
