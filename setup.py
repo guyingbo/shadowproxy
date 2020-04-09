@@ -34,7 +34,7 @@ setup(
     packages=find_namespace_packages(include=["shadowproxy*"]),
     install_requires=[
         "pycryptodome>=3.4.3",
-        "curio>=0.9",
+        "curio==0.9",
         "pylru>=1.0.9",
         # "microstats>=0.1.0",
         "iofree>=0.2.3",
