@@ -1,12 +1,7 @@
 import curio
 import socket
-
-# import signal
 import ipaddress
 from . import gvars
-
-# from curio.signal import SignalEvent
-# from microstats import MicroStats
 import iofree
 from iofree import ParseError
 
@@ -93,22 +88,6 @@ def human_speed(speed: int) -> str:
         return f"{speed/1024:.1f} KB/s"
     else:
         return f"{speed/1048576:.1f} MB/s"
-
-
-# async def show_stats():
-#     pid = os.getpid()
-#     print(f"kill -USR1 {pid} to show connections")
-#     stats.incr("traffic", 0)
-#     sig = SignalEvent(signal.SIGUSR1)
-#     while True:
-#         await sig.wait()
-#         sig.clear()
-#         n = len(connections)
-#         data = stats.flush()
-#         print(
-#             f'{n} connections {human_bytes(data["traffic"])} '
-#             f'{human_speed(data["traffic"]/60)}'
-#         )
 
 
 async def open_connection(host, port, **kwargs):

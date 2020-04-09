@@ -1,6 +1,5 @@
 from ...utils import run_parser_curio
 from ..base.server import ProxyBase
-from iofree.contrib import socks5 as socks5_models
 from ...protocols import socks5, socks4
 
 
@@ -17,9 +16,6 @@ class SocksProxy(ProxyBase):
     async def _run(self):
         socks5_parser = socks5.server.parser(self.auth)
         request = await run_parser_curio(socks5_parser, self.client)
-        assert (
-            request.cmd is socks5_models.Cmd.connect
-        ), f"only support connect command {socks5_models.Cmd.connect!r}"
         self.target_addr = (request.addr.host, request.addr.port)
         via_client = await self.connect_server(self.target_addr)
         await self.client.sendall(socks5.resp())

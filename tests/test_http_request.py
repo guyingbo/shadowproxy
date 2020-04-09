@@ -17,7 +17,7 @@ async def make_request(client, url=None):
         url = url_http
     headers = ["User-Agent: curl/7.54.0", "Accept: */*"]
     async with client:
-        async with curio.timeout_after(20):
+        async with curio.timeout_after(40):
             response = await client.http_request(url, headers=headers)
             assert response.size > 0
 

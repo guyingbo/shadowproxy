@@ -8,7 +8,7 @@ from .exceptions import ProtocolError
 def server(auth: typing.Tuple[str, str]):
     parser = yield from iofree.get_parser()
     handshake = yield from socks5.Handshake.get_value()
-    addr = socks5.Addr(3, "0.0.0.0", 0)
+    addr = socks5.Addr(1, "0.0.0.0", 0)
     if auth:
         if socks5.AuthMethod.user_auth not in handshake.methods:
             parser.respond(
@@ -34,8 +34,10 @@ def server(auth: typing.Tuple[str, str]):
             data=socks5.ServerSelection(..., socks5.AuthMethod.no_auth).binary
         )
     request = yield from socks5.ClientRequest.get_value()
+    assert (
+        request.cmd is socks5.Cmd.connect
+    ), f"only support connect command now, got {socks5.Cmd.connect!r}"
     parser.respond(result=request)
-    return
 
 
 @iofree.parser
