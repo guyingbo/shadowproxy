@@ -1,5 +1,6 @@
 # Shadowproxy
 
+![Python package](https://github.com/guyingbo/shadowproxy/workflows/Python%20package/badge.svg?branch=master)
 [![Build Status](https://travis-ci.org/guyingbo/shadowproxy.svg?branch=master)](https://travis-ci.org/guyingbo/shadowproxy)
 [![Python Version](https://img.shields.io/pypi/pyversions/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
 [![Version](https://img.shields.io/pypi/v/shadowproxy.svg)](https://pypi.python.org/pypi/shadowproxy)
