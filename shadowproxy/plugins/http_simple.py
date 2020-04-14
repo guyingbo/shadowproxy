@@ -1,8 +1,7 @@
 from datetime import datetime
-from .. import gvars
 from .base import Plugin
-from ..utils import set_disposable_recv
-from ..proxies.http.parser import http_response, http_request
+from ..utils import set_disposable_recv, run_parser_curio
+from ..protocols import http
 
 request_tmpl = (
     b"GET / HTTP/1.1\r\n"
@@ -20,13 +19,9 @@ class HttpSimplePlugin(Plugin):
     name = "http_simple"
 
     async def init_server(self, client):
-        parser = http_request.parser()
-        while not parser.has_result:
-            data = await client.recv(gvars.PACKET_SIZE)
-            if not data:
-                raise Exception("incomplete http request")
-            parser.send(data)
-        head = bytes.fromhex(parser.path[1:].replace(b"%", b"").decode("ascii"))
+        parser = http.HTTPRequest.get_parser()
+        request = await run_parser_curio(parser, client)
+        head = bytes.fromhex(request.path[1:].replace(b"%", b"").decode("ascii"))
         await client.sendall(
             b"HTTP/1.1 200 OK\r\n"
             b"Connection: keep-alive\r\n"
@@ -43,12 +38,10 @@ class HttpSimplePlugin(Plugin):
     async def init_client(self, client):
         request = request_tmpl % client.target_address.encode()
         await client.sock.sendall(request)
-        parser = http_response.parser()
-        while not parser.has_result:
-            data = await client.sock.recv(gvars.PACKET_SIZE)
-            if not data:
-                raise Exception("http_simple plugin handshake failed")
-            parser.send(data)
-        assert parser.code == b"200", f"bad status code {parser.code} {parser.status}"
+        parser = http.HTTPResponse.get_parser()
+        response = await run_parser_curio(parser, client.sock)
+        assert (
+            response.code == b"200"
+        ), f"bad status code {response.code} {response.status}"
         redundant = parser.readall()
         set_disposable_recv(client.sock, redundant)

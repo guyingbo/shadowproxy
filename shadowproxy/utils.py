@@ -3,16 +3,14 @@ import socket
 import ipaddress
 from . import gvars
 import iofree
-from iofree import ParseError
 
 
 async def run_parser_curio(parser, sock):
     parser.send(b"")
     while True:
-        while parser.events:
-            data, close, exc, result = parser.events.popleft()
-            if data:
-                await sock.sendall(data)
+        for to_send, close, exc, result in parser:
+            if to_send:
+                await sock.sendall(to_send)
             if close:
                 await sock.close()
             if exc:
@@ -21,7 +19,7 @@ async def run_parser_curio(parser, sock):
                 return result
         data = await sock.recv(gvars.PACKET_SIZE)
         if not data:
-            raise ParseError("need data")
+            raise iofree.ParseError("need data")
         parser.send(data)
 
 

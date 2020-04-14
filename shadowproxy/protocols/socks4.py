@@ -49,6 +49,8 @@ def server():
         addr = (request.dst_ip, request.dst_port)
     assert request.cmd is Cmd.connect
     parser.respond(result=addr)
+    rep = yield from iofree.wait_event()
+    parser.respond(data=Response(..., Rep(rep), 0, "0.0.0.0").binary)
 
 
 @iofree.parser
@@ -65,7 +67,3 @@ def client(addr):
     response = yield from Response.get_value()
     assert response.rep is Rep.granted
     parser.respond(result=response)
-
-
-def resp():
-    return Response(..., Rep.granted, 0, "0.0.0.0").binary

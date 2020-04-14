@@ -1,8 +1,9 @@
 import base64
-from ... import gvars, __version__
+from ... import __version__
 from ..base.client import ClientBase
 from ...utils import set_disposable_recv
-from .parser import http_response
+from ...protocols import http
+from ...utils import run_parser_curio
 
 
 class HTTPClient(ClientBase):
@@ -23,13 +24,12 @@ class HTTPClient(ClientBase):
         headers_str += "\r\n"
         await self.sock.sendall(headers_str.encode())
 
-        parser = http_response.parser()
-        while not parser.has_result:
-            data = await self.sock.recv(gvars.PACKET_SIZE)
-            if not data:
-                raise Exception("http client handshake failed")
-            parser.send(data)
-        assert parser.code == b"200", f"bad status code: {parser.code} {parser.status}"
+        parser = http.HTTPResponse.get_parser()
+        response = await run_parser_curio(parser, self.sock)
+
+        assert (
+            response.code == b"200"
+        ), f"bad status code: {parser.code} {parser.status}"
         redundant = parser.readall()
         set_disposable_recv(self.sock, redundant)
 

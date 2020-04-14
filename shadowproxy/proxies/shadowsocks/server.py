@@ -1,6 +1,7 @@
-from ... import gvars
 from ..base.server import ProxyBase
-from .parser import addr_reader, ss_reader
+from .parser import ss_reader
+from ...utils import run_parser_curio
+from iofree.contrib.common import Addr
 
 
 class SSProxy(ProxyBase):
@@ -20,13 +21,9 @@ class SSProxy(ProxyBase):
             self.proto += f"({self.plugin.name})"
             await self.plugin.init_server(self.client)
 
-        addr_parser = addr_reader.parser()
-        while not addr_parser.has_result:
-            data = await self.recv(gvars.PACKET_SIZE)
-            if not data:
-                return
-            addr_parser.send(data)
-        self.target_addr, _ = addr_parser.get_result()
+        addr_parser = Addr.get_parser()
+        addr = await run_parser_curio(addr_parser, self)
+        self.target_addr = (addr.host, addr.port)
         via_client = await self.connect_server(self.target_addr)
 
         async with via_client:

@@ -18,7 +18,9 @@ class SocksProxy(ProxyBase):
         request = await run_parser_curio(socks5_parser, self.client)
         self.target_addr = (request.addr.host, request.addr.port)
         via_client = await self.connect_server(self.target_addr)
-        await self.client.sendall(socks5.resp())
+        # await self.client.sendall(socks5.resp())
+        socks5_parser.send_event(0)
+        await run_parser_curio(socks5_parser, self.client)
 
         async with via_client:
             redundant = socks5_parser.readall()
@@ -41,7 +43,8 @@ class Socks4Proxy(ProxyBase):
         socks4_parser = socks4.server.parser()
         self.target_addr = await run_parser_curio(socks4_parser, self.client)
         via_client = await self.connect_server(self.target_addr)
-        await self.client.sendall(socks4.resp())
+        socks4_parser.send_event(0x5A)
+        await run_parser_curio(socks4_parser, self.client)
 
         async with via_client:
             redundant = socks4_parser.readall()

@@ -4,7 +4,6 @@ import struct
 import random
 import hashlib
 import binascii
-from .. import gvars
 from .base import Plugin
 from .tls_parser import (
     tls1_2_request,
@@ -14,7 +13,7 @@ from .tls_parser import (
     pack_uint16,
     tls1_2_response,
 )
-from ..utils import set_disposable_recv
+from ..utils import set_disposable_recv, run_parser_curio
 
 
 class TLS1_2Plugin(Plugin):
@@ -28,20 +27,7 @@ class TLS1_2Plugin(Plugin):
     async def init_server(self, client):
         self.response_parser = application_data.parser(self)
         tls_parser = tls1_2_request.parser(self)
-        hello_sent = False
-        while True:
-            data = await client.recv(gvars.PACKET_SIZE)
-            if not data:
-                return
-            tls_parser.send(data)
-            if not hello_sent:
-                server_hello = tls_parser.read()
-                if not server_hello:
-                    continue
-                await client.sendall(server_hello)
-                hello_sent = True
-            if tls_parser.has_result:
-                break
+        await run_parser_curio(tls_parser, client)
         redundant = tls_parser.readall()
         set_disposable_recv(client, redundant)
 

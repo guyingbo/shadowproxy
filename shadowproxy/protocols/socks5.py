@@ -38,6 +38,8 @@ def server(auth: typing.Tuple[str, str]):
         request.cmd is socks5.Cmd.connect
     ), f"only support connect command now, got {socks5.Cmd.connect!r}"
     parser.respond(result=request)
+    rep = yield from iofree.wait_event()
+    parser.respond(data=socks5.Reply(..., socks5.Rep(rep), ..., addr).binary)
 
 
 @iofree.parser

@@ -122,7 +122,7 @@ def tls1_2_request(plugin):
     change_cipher_spec += hmac.new(
         plugin.server.cipher.master_key + session_id, change_cipher_spec, hashlib.sha1
     ).digest()[:10]
-    parser.write(server_hello + change_cipher_spec)
+    parser.respond(data=server_hello + change_cipher_spec)
     yield from ChangeCipherReader(plugin, plugin.server.cipher.master_key, session_id)
 
 

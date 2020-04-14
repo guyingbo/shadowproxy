@@ -1,9 +1,9 @@
 import base64
 from urllib import parse
-from ... import gvars
 from ..base.server import ProxyBase
-from .parser import http_request
 from .client import HTTPForwardClient
+from ...protocols import http
+from ...utils import run_parser_curio
 
 
 class HTTPProxy(ProxyBase):
@@ -17,29 +17,25 @@ class HTTPProxy(ProxyBase):
         self.kwargs = kwargs
 
     async def _run(self):
-        parser = http_request.parser()
-        while not parser.has_result:
-            data = await self.client.recv(gvars.PACKET_SIZE)
-            if not data:
-                raise Exception("incomplete http connect request")
-            parser.send(data)
+        parser = http.HTTPRequest.get_parser()
+        request = await run_parser_curio(parser, self.client)
         if self.auth:
-            pauth = parser.headers.get(b"Proxy-Authorization", None)
+            pauth = request.headers.get(b"Proxy-Authorization", None)
             httpauth = b"Basic " + base64.b64encode(b":".join(self.auth))
             if httpauth != pauth:
                 await self.client.sendall(
-                    parser.ver + b" 407 Proxy Authentication Required\r\n"
+                    request.ver + b" 407 Proxy Authentication Required\r\n"
                     b"Connection: close\r\n"
                     b'Proxy-Authenticate: Basic realm="Shadowproxy Auth"\r\n\r\n'
                 )
                 raise Exception("Unauthorized HTTP Request")
-        if parser.method == b"CONNECT":
+        if request.method == b"CONNECT":
             self.proto = "HTTP(CONNECT)"
-            host, _, port = parser.path.partition(b":")
+            host, _, port = request.path.partition(b":")
             self.target_addr = (host.decode(), int(port))
         else:
             self.proto = "HTTP(PASS)"
-            url = parse.urlparse(parser.path)
+            url = parse.urlparse(request.path)
             if not url.hostname:
                 await self.client.sendall(
                     b"HTTP/1.1 200 OK\r\n"
@@ -53,7 +49,7 @@ class HTTPProxy(ProxyBase):
             newpath = url._replace(netloc=b"", scheme=b"").geturl()
         via_client = await self.connect_server(self.target_addr)
         async with via_client:
-            if parser.method == b"CONNECT":
+            if request.method == b"CONNECT":
                 await self.client.sendall(
                     b"HTTP/1.1 200 Connection: Established\r\n\r\n"
                 )
@@ -61,7 +57,7 @@ class HTTPProxy(ProxyBase):
             else:
                 headers_list = [
                     b"%s: %s" % (k, v)
-                    for k, v in parser.headers.items()
+                    for k, v in request.headers.items()
                     if not k.startswith(b"Proxy-")
                 ]
                 if isinstance(via_client, HTTPForwardClient):
@@ -69,9 +65,9 @@ class HTTPProxy(ProxyBase):
                     newpath = url.geturl()
                 lines = b"\r\n".join(headers_list)
                 remote_req_headers = b"%s %s %s\r\n%s\r\n\r\n" % (
-                    parser.method,
+                    request.method,
                     newpath,
-                    parser.ver,
+                    request.ver,
                     lines,
                 )
             redundant = parser.readall()
