@@ -33,7 +33,7 @@ class TLS1_2Plugin(Plugin):
 
     def decode(self, data):
         self.response_parser.send(data)
-        return self.response_parser.read()
+        return self.response_parser.read_output_bytes()
 
     def encode(self, data):
         ret = b""

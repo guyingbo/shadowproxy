@@ -22,7 +22,7 @@ class SSClient(ClientBase):
             if not data:
                 return await self.recv(size)
         self.ss_parser.send(data)
-        data = self.ss_parser.read()
+        data = self.ss_parser.read_output_bytes()
         if not data:
             data = await self.recv(size)
         return data

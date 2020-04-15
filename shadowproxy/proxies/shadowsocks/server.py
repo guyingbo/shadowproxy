@@ -41,7 +41,7 @@ class SSProxy(ProxyBase):
             if not data:
                 return await self.recv(size)
         self.ss_parser.send(data)
-        return self.ss_parser.read()
+        return self.ss_parser.read_output_bytes()
 
     async def sendall(self, data):
         iv = b""

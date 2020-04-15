@@ -9,7 +9,7 @@ def aead_reader(cipher):
     parser.decrypt = cipher.make_decrypter(salt)
     while True:
         payload = yield from _read_some()
-        parser.write(payload)
+        parser.respond(result=payload)
 
 
 def _read_some():

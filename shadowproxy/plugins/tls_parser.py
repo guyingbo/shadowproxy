@@ -160,4 +160,4 @@ def application_data(plugin):
             size = int.from_bytes(data[3:], "big")
             assert size == size & 0x3FFF, f"{size} is over 2^14"
             data = yield from iofree.read(size)
-            parser.write(data)
+            parser.respond(result=data)

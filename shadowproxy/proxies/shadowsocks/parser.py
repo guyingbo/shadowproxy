@@ -8,4 +8,4 @@ def ss_reader(cipher):
     decrypt = cipher.make_decrypter(iv)
     while True:
         data = yield from iofree.read_more()
-        parser.write(decrypt(data))
+        parser.respond(result=decrypt(data))

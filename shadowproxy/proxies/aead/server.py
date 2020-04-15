@@ -42,7 +42,7 @@ class AEADProxy(ProxyBase):
             if not data:
                 return await self.recv(size)
         self.aead_parser.send(data)
-        data = self.aead_parser.read()
+        data = self.aead_parser.read_output_bytes()
         if not data:
             data = await self.recv(size)
         return data
