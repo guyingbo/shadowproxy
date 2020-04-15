@@ -37,7 +37,7 @@ setup(
         "curio==0.9",
         "pylru>=1.0.9",
         # "microstats>=0.1.0",
-        "iofree>=0.2.3",
+        "iofree>=0.2.4",
         "httptools",
         "hkdf",
     ],

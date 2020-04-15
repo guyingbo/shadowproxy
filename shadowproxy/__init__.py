@@ -48,4 +48,4 @@ shadowproxy -v \
 # tproxy -> shadowsocks (udp)
 sudo shadowproxy -v tproxyudp://:8527/?via=ssudp://chacha20:password@127.0.0.1:8888
 """
-__version__ = "0.6.7"
+__version__ = "0.6.8"
