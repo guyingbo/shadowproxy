@@ -1,7 +1,9 @@
+import argparse
 import os
 import signal
+
 import pytest
-import argparse
+
 from shadowproxy.__main__ import get_server, main
 
 

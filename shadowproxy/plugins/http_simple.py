@@ -1,7 +1,8 @@
 from datetime import datetime
-from .base import Plugin
-from ..utils import set_disposable_recv, run_parser_curio
+
 from ..protocols import http
+from ..utils import run_parser_curio, set_disposable_recv
+from .base import Plugin
 
 request_tmpl = (
     b"GET / HTTP/1.1\r\n"

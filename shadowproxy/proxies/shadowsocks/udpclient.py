@@ -1,7 +1,8 @@
 import curio
+
 from ... import gvars
-from ..base.udpclient import UDPClient
 from ...utils import pack_addr, unpack_addr
+from ..base.udpclient import UDPClient
 
 
 class SSUDPClient(UDPClient):

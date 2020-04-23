@@ -1,5 +1,5 @@
-import sys
 import logging
+import sys
 
 PACKET_SIZE = 8192
 logger = logging.getLogger(__package__)

@@ -1,8 +1,10 @@
 import struct
-import pylru
 import weakref
+
+import pylru
 from curio import socket
-from ...utils import is_global, ViaNamespace
+
+from ...utils import ViaNamespace, is_global
 from ..base.udpclient import UDPClient
 from ..base.udpserver import UDPServerBase
 

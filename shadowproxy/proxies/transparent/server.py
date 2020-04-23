@@ -1,5 +1,7 @@
 import struct
+
 from curio import socket
+
 from ... import gvars
 from ..base.server import ProxyBase
 

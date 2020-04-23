@@ -1,20 +1,21 @@
-import os
-import curio
-import base64
-import weakref
-import logging
 import argparse
-import resource
+import base64
 import ipaddress
-from curio import ssl
-from curio import socket
-from curio.network import run_server
+import logging
+import os
+import resource
+import weakref
 from urllib import parse
-from . import gvars
+
+import curio
+from curio import socket, ssl
+from curio.network import run_server
+
+from . import __doc__ as desc
+from . import __version__, gvars
 from .ciphers import ciphers
-from . import __version__, __doc__ as desc
-from .proxies import server_protos, via_protos
 from .plugins import plugins
+from .proxies import server_protos, via_protos
 from .utils import ViaNamespace
 
 connections = weakref.WeakSet()

@@ -1,14 +1,16 @@
-import curio
 import socket
-import pytest
 from ipaddress import ip_address
+
+import curio
+import pytest
+
 from shadowproxy.utils import (
+    human_bytes,
+    human_speed,
     is_global,
+    open_connection,
     pack_addr,
     unpack_addr,
-    human_speed,
-    human_bytes,
-    open_connection,
 )
 
 

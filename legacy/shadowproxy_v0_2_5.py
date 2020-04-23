@@ -40,28 +40,29 @@ tunneludp://:8527#8.8.8.8:53=ssudp://aes-256-cfb:password@127.0.0.1:8888
   sudo shadowproxy -v \
 tproxyudp://:8527=ssudp://aes-256-cfb:password@127.0.0.1:8888
 """
-from Crypto import Random
-from Crypto.Cipher import AES, ChaCha20, Salsa20, ARC4
-from hashlib import md5
-from curio import spawn, tcp_server, socket, CancelledError, TaskGroup, ssl
-from curio.signal import SignalEvent
-from microstats import MicroStats
-from functools import partial
-import urllib.parse
-import ipaddress
-import traceback
-import httptools
 import argparse
-import resource
-import weakref
 import base64
+import ipaddress
+import os
+import re
+import resource
 import signal
 import struct
-import types
-import curio
 import sys
-import re
-import os
+import traceback
+import types
+import urllib.parse
+import weakref
+from functools import partial
+from hashlib import md5
+
+import curio
+import httptools
+from Crypto import Random
+from Crypto.Cipher import AES, ARC4, ChaCha20, Salsa20
+from curio import CancelledError, TaskGroup, socket, spawn, ssl, tcp_server
+from curio.signal import SignalEvent
+from microstats import MicroStats
 
 __version__ = "0.2.5"
 SO_ORIGINAL_DST = 80

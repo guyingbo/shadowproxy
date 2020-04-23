@@ -1,9 +1,10 @@
 import base64
 from urllib import parse
-from ..base.server import ProxyBase
-from .client import HTTPForwardClient
+
 from ...protocols import http
 from ...utils import run_parser_curio
+from ..base.server import ProxyBase
+from .client import HTTPForwardClient
 
 
 class HTTPProxy(ProxyBase):

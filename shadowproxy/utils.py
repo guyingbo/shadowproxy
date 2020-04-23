@@ -1,8 +1,11 @@
-import curio
-import socket
 import ipaddress
-from . import gvars
+import socket
+
+import curio
+
 import iofree
+
+from . import gvars
 
 
 async def run_parser_curio(parser, sock):

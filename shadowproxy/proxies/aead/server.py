@@ -1,7 +1,8 @@
-from .parser import aead_reader
-from ..base.server import ProxyBase
-from ...utils import run_parser_curio
 from iofree.contrib.common import Addr
+
+from ...utils import run_parser_curio
+from ..base.server import ProxyBase
+from .parser import aead_reader
 
 
 class AEADProxy(ProxyBase):

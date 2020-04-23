@@ -1,6 +1,7 @@
 import os
 import random
-from shadowproxy.ciphers import ciphers, StreamCipher
+
+from shadowproxy.ciphers import StreamCipher, ciphers
 
 
 def test_ciphers():

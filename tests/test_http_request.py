@@ -1,7 +1,9 @@
-import curio
 import subprocess
+
+import curio
+
 from shadowproxy import gvars
-from shadowproxy.__main__ import get_server, get_client
+from shadowproxy.__main__ import get_client, get_server
 
 gvars.logger.setLevel(10)
 # url_https = "https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"

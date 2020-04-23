@@ -1,7 +1,9 @@
 import abc
+
 import curio
+
 from ... import gvars
-from ...utils import open_connection, is_global
+from ...utils import is_global, open_connection
 
 
 class ProxyBase(abc.ABC):

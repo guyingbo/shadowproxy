@@ -1,6 +1,8 @@
-import iofree
 import typing
+
+import iofree
 from iofree.contrib import socks5
+
 from .exceptions import ProtocolError
 
 

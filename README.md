@@ -25,8 +25,16 @@ It is a replacement of shadowsocks and shadowsocks-libev, you can replace ss-red
 
 shadowproxy requires Python3.6+
 
+install with pip
+
 ```
 pip3 install shadowproxy
+```
+
+or run with docker, for example:
+
+```
+docker run -it --rm -p 8000:8527 tensiongyb/shadowproxy -vv socks://:8527
 ```
 
 ## Features

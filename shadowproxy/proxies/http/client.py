@@ -1,9 +1,9 @@
 import base64
+
 from ... import __version__
-from ..base.client import ClientBase
-from ...utils import set_disposable_recv
 from ...protocols import http
-from ...utils import run_parser_curio
+from ...utils import run_parser_curio, set_disposable_recv
+from ..base.client import ClientBase
 
 
 class HTTPClient(ClientBase):

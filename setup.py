@@ -1,6 +1,7 @@
-from setuptools import setup, find_namespace_packages
 import os.path
 import re
+
+from setuptools import find_namespace_packages, setup
 
 VERSION_RE = re.compile(r"""__version__ = ['"]([0-9.]+)['"]""")
 BASE_PATH = os.path.dirname(__file__)

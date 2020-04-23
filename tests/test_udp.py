@@ -1,5 +1,6 @@
-from curio import subprocess
 import curio
+from curio import subprocess
+
 from shadowproxy import gvars
 from shadowproxy.__main__ import get_server
 

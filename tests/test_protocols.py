@@ -1,8 +1,9 @@
 import os
 import secrets
+
 from shadowproxy.ciphers import AES128GCM, AES256CFB
-from shadowproxy.proxies.shadowsocks.parser import ss_reader
 from shadowproxy.proxies.aead.parser import aead_reader
+from shadowproxy.proxies.shadowsocks.parser import ss_reader
 
 
 def test_ss():

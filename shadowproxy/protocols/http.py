@@ -1,4 +1,5 @@
 import re
+
 from iofree import schema
 
 HTTP_LINE = re.compile(b"([^ ]+) +(.+?) +(HTTP/[^ ]+)")

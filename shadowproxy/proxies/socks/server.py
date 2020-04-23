@@ -1,6 +1,6 @@
+from ...protocols import socks4, socks5
 from ...utils import run_parser_curio
 from ..base.server import ProxyBase
-from ...protocols import socks5, socks4
 
 
 class SocksProxy(ProxyBase):

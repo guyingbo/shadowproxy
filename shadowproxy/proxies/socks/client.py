@@ -1,9 +1,10 @@
 import random
+
 from curio import socket
+
+from ...protocols import socks4, socks5
+from ...utils import run_parser_curio, set_disposable_recv
 from ..base.client import ClientBase
-from ...utils import run_parser_curio
-from ...utils import set_disposable_recv
-from ...protocols import socks5, socks4
 
 
 class SocksClient(ClientBase):

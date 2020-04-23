@@ -1,11 +1,12 @@
-import os
+import binascii
+import hashlib
 import hmac
+import os
 import random
 import struct
-import iofree
-import hashlib
-import binascii
 from time import time
+
+import iofree
 
 
 def pack_uint16(s):

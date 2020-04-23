@@ -1,5 +1,6 @@
 import curio
 from curio import socket
+
 from ... import gvars
 
 

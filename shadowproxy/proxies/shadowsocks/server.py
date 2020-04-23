@@ -1,7 +1,8 @@
+from iofree.contrib.common import Addr
+
+from ...utils import run_parser_curio
 from ..base.server import ProxyBase
 from .parser import ss_reader
-from ...utils import run_parser_curio
-from iofree.contrib.common import Addr
 
 
 class SSProxy(ProxyBase):
