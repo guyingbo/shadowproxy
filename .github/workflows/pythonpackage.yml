@@ -18,8 +18,8 @@ jobs:
         python-version:
           - "3.8"
           - "3.9"
-          # - "3.10"
-          # - "3.11"
+           - "3.10"
+           - "3.11"
           # - "3.12"
           # - "3.13"
           # - "3.14"
@@ -40,3 +40,11 @@ jobs:
 
     - name: Test with pytest
       run: uv run pytest
+
+  docker_build:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Build the Docker image
+      run: docker build . -t shadowproxy:latest
