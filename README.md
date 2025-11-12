@@ -215,3 +215,11 @@ Then you can run your local image:
 ```bash
 docker run -it --rm -p 8000:8527 shadowproxy -vv socks://:8527
 ```
+
+## Testing
+
+To run the tests, use `uv run pytest`:
+
+```bash
+uv run pytest
+```
