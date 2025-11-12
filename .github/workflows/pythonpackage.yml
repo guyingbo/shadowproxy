@@ -33,16 +33,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: uv sync --allow-extra --dev
+      run: uv sync --locked --allow-extras --dev
 
     - name: ruff check
       run: uvx ruff check shadowproxy
 
     - name: Test with pytest
       run: uv run pytest
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        token: ${{ secrets.CODECOV_TOKEN }}
