@@ -33,7 +33,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: uv sync --locked --allow-extras --dev
+      run: uv sync --locked --all-extras --dev
 
     - name: ruff check
       run: uvx ruff check shadowproxy
