@@ -7,9 +7,8 @@ python:
 before_install:
   - sudo sh iptables_redir.sh
 install:
-  - python setup.py install
-  - pip install codecov
+  - pip install .[test]
 script:
-  - python setup.py test
+  - pytest
 # after_success:
 #   - codecov

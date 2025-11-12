@@ -1,0 +1,60 @@
+# pyproject.toml
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "shadowproxy"
+description = "A proxy server that implements Socks5/Shadowsocks/Redirect/HTTP (tcp) and Shadowsocks/TProxy/Tunnel (udp) protocols."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.6"
+authors = [
+    { name = "Yingbo Gu", email = "tensiongyb@gmail.com" },
+]
+maintainers = [
+    { name = "Yingbo Gu", email = "tensiongyb@gmail.com" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+]
+dynamic = ["version"]
+
+dependencies = [
+    "pycryptodome>=3.4.3",
+    "curio==0.9",
+    "pylru>=1.0.9",
+    "iofree>=0.2.4",
+    "httptools",
+    "hkdf",
+]
+
+[project.urls]
+Homepage = "https://github.com/guyingbo/shadowproxy"
+
+[project.scripts]
+shadowproxy = "shadowproxy.__main__:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "coverage",
+    "pytest-cov",
+    "flake8",
+    "codecov",
+]
+
+[tool.hatch.version]
+path = "shadowproxy/__init__.py"
+
+[tool.pytest.ini_options]
+addopts = "-s --verbose tests --cov=shadowproxy --cov=tests --cov-report=term-missing --cov-report=xml"
+
+[tool.isort]
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
